@@ -12,7 +12,7 @@ const ai = new GoogleGenAI({
   apiKey: process.env.GEMINI_API_KEY,
 });
 
-const ingredientSchema = z.object({
+const outputSchema = z.object({
     followup: z.array(z.string()),
     answer: z.string(),
 });
@@ -41,19 +41,20 @@ app.post('/conversation', async (req, res) => {
             systemInstruction: SYSTEM_PROMPT,
             temperature: 0.7,
             responseMimeType: "application/json",
-            responseSchema: zodToJsonSchema(ingredientSchema),
+            responseSchema: zodToJsonSchema(outputSchema),
         },
     });
 
+    // data streaming chunk by chunk
     for await (const chunk of response) {
-        res.write(chunk.text ?? "");
+        res.write(chunk.text ?? ""); // send chunk to clientside
     } 
-    console.log("Web search results: ", webResults);
-    res.write("------SOURCEs------\n");
-    //
-    webResults.forEach((result: any) => res.write(JSON.stringify(result)));
 
-    res.end();
+    // send web search results to clientside
+    res.write("------SOURCEs------\n");
+    // all search result 
+    webResults.forEach((result: any) => res.write(JSON.stringify(result)));
+    res.end(); // streaming end
 })
 
 app.listen(port);
