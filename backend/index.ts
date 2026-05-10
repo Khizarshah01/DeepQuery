@@ -7,9 +7,10 @@ const port = 3000;
 const client = tavily({ apiKey: process.env.TAVILY_API_KEY });
 import { GoogleGenAI } from "@google/genai";
 import { PROMPT_TEMPLATE, SYSTEM_PROMPT } from './prompt';
+import { prisma } from './db';
 app.use(express.json());
 const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY,
+    apiKey: process.env.GEMINI_API_KEY,
 });
 
 const outputSchema = z.object({
@@ -17,6 +18,15 @@ const outputSchema = z.object({
     answer: z.string(),
 });
 
+const newUser = await prisma.user.create({
+    data: {
+        email: "Alice@gmail.com",
+        name: "Alice",
+        Auth: "GOOGLE"
+    }
+});
+
+console.log("New user created:", newUser);
 
 app.post('/conversation', async (req, res) => {
 
@@ -48,13 +58,27 @@ app.post('/conversation', async (req, res) => {
     // data streaming chunk by chunk
     for await (const chunk of response) {
         res.write(chunk.text ?? ""); // send chunk to clientside
-    } 
+    }
 
     // send web search results to clientside
-    res.write("------SOURCEs------\n");
+    res.write("\n<SOURCES>\n");
+
     // all search result 
-    webResults.forEach((result: any) => res.write(JSON.stringify(result)));
+    res.write(JSON.stringify(webResults.map((result: any) => ({url: result.url}))));
+
+  res.write("\n</SOURCES>\n");
+
     res.end(); // streaming end
+})
+
+
+// follow up question endpoint
+app.post("/followup", async(req,res)=>{
+    // get exisintg conversation context and followup question from db
+
+    // send full history to llm 
+
+    // stream response back to clientside 
 })
 
 app.listen(port);
