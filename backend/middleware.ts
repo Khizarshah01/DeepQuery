@@ -2,7 +2,7 @@ import type { NextFunction, Request, Response } from "express";
 import { createSupabaseClient } from "./client";
 import { prisma } from "./db";
 
-type AuthedRequest = Request & { userId?: string };
+export type AuthedRequest = Request & { userId?: string };
 
 const client = createSupabaseClient();
 

@@ -1,27 +1,26 @@
-import { Button } from "@/components/ui/button";
 import {
-    MessageSquare,
-    Plus,
     Search,
     Sparkles,
+    Code,
+    Globe,
 } from "lucide-react";
 
 const SUGGESTIONS = [
     {
         title: "Summarize a topic",
-        icon: <Sparkles className="size-4" />,
+        icon: <Sparkles className="size-3.5" />,
     },
     {
-        title: "Explain complex concepts",
-        icon: <MessageSquare className="size-4" />,
-    },
-    {
-        title: "Find the latest news",
-        icon: <Search className="size-4" />,
+        title: "Explain concepts",
+        icon: <Search className="size-3.5" />,
     },
     {
         title: "Help me with code",
-        icon: <Plus className="size-4" />,
+        icon: <Code className="size-3.5" />,
+    },
+    {
+        title: "Find latest news",
+        icon: <Globe className="size-3.5" />,
     },
 ];
 
@@ -31,28 +30,16 @@ type SuggestionsProps = {
 
 export function Suggestions({ askQuestion }: SuggestionsProps) {
     return (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-2xl">
+        <div className="flex flex-wrap justify-center gap-2">
             {SUGGESTIONS.map((s, i) => (
-                <Button
+                <button
                     key={i}
-                    variant="outline"
-                    className="h-auto py-4 px-5 justify-start gap-4 bg-card/50 backdrop-blur-sm hover:bg-accent border-border/50 shadow-sm transition-all hover:-translate-y-1 hover:shadow-md group"
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 text-sm font-medium text-slate-700 dark:text-white hover:bg-slate-50 dark:hover:bg-white/10 hover:border-slate-300 dark:hover:border-white/20 transition-all"
                     onClick={() => askQuestion(s.title)}
                 >
-                    <div className="size-10 rounded-xl bg-background flex items-center justify-center shadow-inner group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
-                        {s.icon}
-                    </div>
-
-                    <div className="text-left">
-                        <span className="block font-bold text-sm">
-                            {s.title}
-                        </span>
-
-                        <span className="block text-[10px] text-muted-foreground">
-                            Try this prompt
-                        </span>
-                    </div>
-                </Button>
+                    {s.icon}
+                    {s.title}
+                </button>
             ))}
         </div>
     );

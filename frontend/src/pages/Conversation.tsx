@@ -10,6 +10,7 @@ import { Hero } from "../components/Hero";
 import { Footer } from "@/components/common/Footer";
 import { ChatInput } from "@/components/chat/ChatInput";
 import { Sidebar } from "@/components/sidebar/Sidebar";
+import { Menu, Moon, Sun, Github } from "lucide-react";
 
 const supabase = createClient();
 
@@ -22,6 +23,7 @@ export default function Conversation() {
     const [isDark, setIsDark] = useState(false);
     const syncedUserId = useRef<string | null>(null);
     const [conversationId, setConversationId] = useState<string | null>(null);
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -139,38 +141,120 @@ export default function Conversation() {
     }
 
     return (
-        <div className="flex h-screen w-full">
-
+        <div className={`flex h-screen w-full transition-colors duration-500 ${messages.length === 0 ? 'bg-slate-50 dark:bg-[#0d0d12]' : 'bg-white dark:bg-[#111111]'}`}>
             <Sidebar
                 user={user}
                 isDark={isDark}
                 toggleTheme={toggleTheme}
                 handleSignOut={handleSignOut}
+                isOpen={isSidebarOpen}
+                setIsOpen={setIsSidebarOpen}
             />
 
-   <main className="flex-1 flex flex-col items-center justify-center relative p-4 md:p-8 z-10">
+            <main className="flex-1 flex flex-col relative overflow-hidden">
+                
+                {/* Top bar with menu button and auth */}
+                <div className="flex items-center justify-between px-4 py-3 shrink-0">
+                    {!isSidebarOpen && (
+                        <button
+                            onClick={() => setIsSidebarOpen(true)}
+                            className="size-9 rounded-lg flex items-center justify-center text-slate-500 dark:text-white/40 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors"
+                        >
+                            <Menu className="size-5" />
+                        </button>
+                    )}
 
-                <Hero />
+                    <div className="flex items-center gap-2">
+                        {/* GitHub repo link */}
+                        <a
+                            href="https://github.com/Khizarshah01/purplexity"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="size-9 rounded-lg flex items-center justify-center text-slate-500 dark:text-white/40 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors"
+                        >
+                            <Github className="size-4" />
+                        </a>
 
-                <ChatInput
-                    input={input}
-                    setInput={setInput}
-                    askQuestion={askQuestion}
-                    isAsking={isAsking}
-                />
+                        {/* Theme toggle */}
+                        <button
+                            onClick={toggleTheme}
+                            className="size-9 rounded-lg flex items-center justify-center text-slate-500 dark:text-white/40 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors"
+                        >
+                            {isDark ? <Sun className="size-4" /> : <Moon className="size-4" />}
+                        </button>
 
-                <ChatMessages messages={messages} />
+                        {/* Show Sign in / Sign up if not logged in */}
+                        {!user && (
+                            <>
+                                <button
+                                    onClick={() => navigate("/auth")}
+                                    className="px-4 py-1.5 rounded-lg text-sm font-medium text-slate-600 dark:text-white/60 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors"
+                                >
+                                    Sign in
+                                </button>
+                                <button
+                                    onClick={() => navigate("/auth")}
+                                    className="px-4 py-1.5 rounded-lg text-sm font-medium bg-slate-900 dark:bg-white text-white dark:text-black hover:bg-slate-800 dark:hover:bg-white/90 transition-colors"
+                                >
+                                    Sign up
+                                </button>
+                            </>
+                        )}
+                    </div>
+                </div>
 
-                <Suggestions askQuestion={askQuestion} />
+                {/* Background Effects (Only on home screen) */}
+                {messages.length === 0 && (
+                    <>
+                        <div className="absolute top-[-15%] right-[-15%] w-[50vw] h-[50vw] rounded-full bg-purple-200/40 dark:bg-purple-600/20 blur-[120px] pointer-events-none"></div>
+                        <div className="absolute bottom-[-15%] left-[-15%] w-[50vw] h-[50vw] rounded-full bg-blue-200/30 dark:bg-blue-600/15 blur-[120px] pointer-events-none"></div>
+                        <div className="bg-grainy" style={{ WebkitMaskImage: 'radial-gradient(circle at center, transparent 15%, black 85%)', maskImage: 'radial-gradient(circle at center, transparent 15%, black 85%)' }}></div>
+                    </>
+                )}
 
-                <Footer />
+                {/* Content area */}
+                {messages.length === 0 ? (
+                    <div className="flex-1 flex flex-col items-center justify-center px-4 pb-20 relative z-10">
+                        <div className="w-full max-w-2xl flex flex-col items-center space-y-8">
+                            <Hero />
+                            <ChatInput
+                                input={input}
+                                setInput={setInput}
+                                askQuestion={askQuestion}
+                                isAsking={isAsking}
+                            />
+                            <Suggestions askQuestion={askQuestion} />
+                        </div>
+                    </div>
+                ) : (
+                    <div className="flex-1 flex flex-col w-full max-w-3xl mx-auto px-4 overflow-hidden">
+                        <div className="flex-1 overflow-y-auto pb-6">
+                            <ChatMessages messages={messages} />
+                        </div>
+                        <div className="py-4 shrink-0">
+                            <ChatInput
+                                input={input}
+                                setInput={setInput}
+                                askQuestion={askQuestion}
+                                isAsking={isAsking}
+                            />
+                        </div>
+                    </div>
+                )}
 
+                {/* Footer only on home */}
+                {messages.length === 0 && (
+                    <div className="absolute bottom-4 left-0 right-0 flex justify-center z-10">
+                        <Footer />
+                    </div>
+                )}
             </main>
+            
             {chatError && (
-   <div className="rounded-xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-      {chatError}
-   </div>
-)}
+               <div className="fixed bottom-20 left-1/2 transform -translate-x-1/2 rounded-xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive z-50">
+                  {chatError}
+               </div>
+            )}
         </div>
     );
 }

@@ -1,6 +1,4 @@
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { ArrowRight, Search, Sparkles } from "lucide-react";
+import { Sparkles, ArrowUp } from "lucide-react";
 
 type ChatInputProps = {
     input: string;
@@ -16,38 +14,38 @@ export function ChatInput({
     isAsking,
 }: ChatInputProps) {
     return (
-        <div className="relative group w-full max-w-2xl">
-            <div className="absolute -inset-1 bg-gradient-to-r from-primary/20 via-primary/10 to-primary/20 blur-2xl rounded-3xl opacity-0 group-focus-within:opacity-100 transition-all duration-500" />
-
-            <div className="relative flex items-center bg-card/80 backdrop-blur-xl border border-border/50 rounded-2xl p-2 shadow-2xl focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary/30 transition-all">
-                <div className="pl-4 pr-2 text-muted-foreground">
-                    <Search className="size-5" />
-                </div>
-
-                <Input
-                    className="flex-1 border-none bg-transparent shadow-none focus-visible:ring-0 text-xl h-14 placeholder:text-muted-foreground/50"
-                    placeholder="What would you like to know?"
+        <div className="w-full max-w-2xl">
+            <div className="relative rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 shadow-sm focus-within:shadow-md focus-within:border-slate-300 dark:focus-within:border-white/20 transition-all">
+                <textarea
+                    className="w-full min-h-[120px] resize-none rounded-2xl bg-transparent px-5 pt-5 pb-14 text-base text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-white/30 focus:outline-none"
+                    placeholder="Type your ideas here..."
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     onKeyDown={(e) => {
-                        if (e.key === "Enter") {
+                        if (e.key === "Enter" && !e.shiftKey) {
+                            e.preventDefault();
                             askQuestion();
                         }
                     }}
                 />
 
-                <Button
-                    size="icon"
-                    className="rounded-xl size-14 shrink-0 shadow-lg shadow-primary/20 transition-transform active:scale-95"
-                    disabled={!input.trim() || isAsking}
-                    onClick={() => askQuestion()}
-                >
-                    {isAsking ? (
-                        <Sparkles className="size-6 animate-pulse" />
-                    ) : (
-                        <ArrowRight className="size-6" />
-                    )}
-                </Button>
+                {/* Bottom bar inside the textarea box */}
+                <div className="absolute bottom-3 left-4 right-4 flex items-center justify-between">
+                    <span className="text-xs text-slate-400 dark:text-white/30">
+                        Press Enter to search
+                    </span>
+                    <button
+                        disabled={!input.trim() || isAsking}
+                        onClick={() => askQuestion()}
+                        className="size-8 rounded-lg bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-white/90 disabled:bg-slate-200 dark:disabled:bg-white/10 text-white dark:text-black disabled:text-slate-400 dark:disabled:text-white/20 flex items-center justify-center transition-colors"
+                    >
+                        {isAsking ? (
+                            <Sparkles className="size-4 animate-pulse" />
+                        ) : (
+                            <ArrowUp className="size-4" />
+                        )}
+                    </button>
+                </div>
             </div>
         </div>
     );

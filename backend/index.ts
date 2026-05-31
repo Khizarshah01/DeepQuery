@@ -8,8 +8,10 @@ const client = tavily({ apiKey: process.env.TAVILY_API_KEY });
 import { GoogleGenAI } from "@google/genai";
 import { PROMPT_TEMPLATE, SYSTEM_PROMPT } from './prompt';
 import { prisma } from './db';
-import { authMiddleware } from './middleware';
+import type { Response } from "express";
+import { authMiddleware, AuthedRequest} from './middleware'
 import cors from "cors";
+import { deepResearchQueue } from './queue';
 
 app.use(cors());
 app.use(express.json());
@@ -30,7 +32,7 @@ const outputSchema = z.object({
 });
 
 // conversation list 
-app.get('/conversation', authMiddleware, async (req, res) => {
+app.get('/conversation', authMiddleware, async (req:AuthedRequest, res:Response) => {
     const conversations = await prisma.conversation.findMany({
         where: {
             userId: req.userId,
@@ -47,7 +49,7 @@ app.get('/conversation', authMiddleware, async (req, res) => {
 });
 
 // conversation detail with conversationId for chats
-app.get('/conversation/:conversationId', authMiddleware, async (req, res) => {
+app.get('/conversation/:conversationId', authMiddleware, async (req:AuthedRequest, res:Response) => {
     const conversationHistory = await prisma.conversation.findFirst({
         where: {
             id: req.params.conversationId,
@@ -65,7 +67,7 @@ app.get('/conversation/:conversationId', authMiddleware, async (req, res) => {
 });
 
 // ask question 
-app.post('/ask', authMiddleware, async (req, res) => {
+app.post('/ask', authMiddleware, async (req:AuthedRequest, res:Response) => {
 
     // user query and conversation id 
     let { conversationId, userQuery } = req.body;
@@ -185,4 +187,49 @@ app.post('/ask', authMiddleware, async (req, res) => {
 //     // stream response back to clientside 
 // })
 
+app.post('/webhook/config', authMiddleware, async (req:AuthedRequest,res:Response)=>{
+    const { url } = req.body;
+
+    await prisma.webhookConfig.create({
+        data: {
+            userId: req.userId,
+            url: url,
+        }
+    });
+
+    res.json({ message: "Webhook configured successfully" })
+})
+
+
+app.post('/research', authMiddleware, async(req:AuthedRequest,res:Response)=>{
+    let { conversationId, userQuery } = req.body;
+    const jobRecord = await prisma.researchJob.create({
+        data: {
+            userId: req.userId,
+            query: userQuery,
+            conversationId: conversationId || null,
+            status: "PENDING",
+        }
+    });
+
+    await deepResearchQueue.add('deep-research-task', {
+        jobId: jobRecord.id,
+        query: userQuery,
+        userId: req.userId,
+        conversationId: conversationId || null,
+    })
+
+    res.status(202).json({message: "Research job added to queue", jobId: jobRecord.id})
+})
+
+app.get('/research/status/:jobId', authMiddleware, async(req,res)=>{
+    const job = await prisma.researchJob.findUnique({
+        where:{ id: req.params.jobId,}
+    });
+
+    if (!job){
+        return res.status(404).json({message:"Job not found"})
+    }
+    res.json({status: job.status, result: job.result})
+})
 app.listen(port);
