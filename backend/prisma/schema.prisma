@@ -21,7 +21,7 @@ model User{
   name          String
   email         String        @unique
   Auth          AuthProvider
-  supabaseId     String?       @unique
+  supabaseId    String?       @unique
   conversations Conversation[]
 }
 
@@ -30,6 +30,8 @@ model Conversation{
   userId    String
   title     String
   slug      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
   messages  Message[]
   user      User     @relation(fields: [userId], references: [id])
 }
@@ -40,6 +42,7 @@ model Message{
   content         String
   role            MessageRole
   createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
   conversation    Conversation @relation(fields: [conversationId], references: [id])
 }
 

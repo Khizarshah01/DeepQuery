@@ -33,10 +33,13 @@ Make sure to answer the question as best as you can and generate follow up quest
 
 export const PROMPT_TEMPLATE = `
 
+## Conversation History
+{{CONVERSATION_HISTORY}}
+
 ## Web Search Results
 {{WEB_SEARCH_RESULTS}}
 
 ## USER_QUERY
-USER_QUERY: {{userQuery}}
+USER_QUERY: {{USER_QUERY}}
 
 `
