@@ -32,7 +32,7 @@ export function Sidebar({
 
             {/* Header */}
             <div className="flex items-center justify-between p-4 shrink-0">
-                <span className="font-bold text-sm text-slate-900 dark:text-white whitespace-nowrap">Purplexity</span>
+                <span className="font-bold text-sm text-slate-900 dark:text-white whitespace-nowrap">DeepQuery</span>
                 <button onClick={() => setIsOpen(false)} className="size-7 rounded-md flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 transition-colors">
                     <X className="size-4" />
                 </button>

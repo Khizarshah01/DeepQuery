@@ -17,7 +17,7 @@ const supabase = createClient();
 export default function Conversation() {
     const [user, setUser] = useState<User | null>(null);
     const [input, setInput] = useState("");
-    const [messages, setMessages] = useState<{ role: "user" | "assistant"; content: string }[]>([]);
+    const [messages, setMessages] = useState<{ role: "user" | "assistant"; content: string; status?: string }[]>([]);
     const [isAsking, setIsAsking] = useState(false);
     const [chatError, setChatError] = useState<string | null>(null);
     const [isDark, setIsDark] = useState(false);
@@ -124,11 +124,25 @@ export default function Conversation() {
                 if (conversationMatch?.[1]) {
                     setConversationId(conversationMatch[1] as string);
                 }
+
+                const statusMatch = fullText.match(/<STATUS>\s*([\s\S]*?)\s*<\/STATUS>/g);
+                let latestStatus = "Thinking..."; // Default
+                if (statusMatch) {
+                    const last = statusMatch[statusMatch.length - 1] || "";
+                    latestStatus = last.replace(/<\/?STATUS>/g, "").trim();
+                }
+
                 setMessages((current) => {
                     const next = [...current];
                     const last = next[next.length - 1];
-                    if (last?.role === "assistant") {
-                        next[next.length - 1] = { ...last, content: fullText.replace(/<CONVERSATION_ID>[\s\S]*?<\/CONVERSATION_ID>/, "") };
+                    if (last && last.role === "assistant") {
+                        let cleanText = fullText.replace(/<CONVERSATION_ID>[\s\S]*?<\/CONVERSATION_ID>/g, "");
+                        cleanText = cleanText.replace(/<STATUS>[\s\S]*?<\/STATUS>\n?/g, "");
+                        next[next.length - 1] = { 
+                            role: last.role,
+                            content: cleanText,
+                            status: latestStatus 
+                        };
                     }
                     return next;
                 });
@@ -229,7 +243,7 @@ export default function Conversation() {
                 ) : (
                     <div className="flex-1 flex flex-col w-full max-w-3xl mx-auto px-4 overflow-hidden">
                         <div className="flex-1 overflow-y-auto pb-6">
-                            <ChatMessages messages={messages} />
+                            <ChatMessages messages={messages} onFollowupClick={askQuestion} />
                         </div>
                         <div className="py-4 shrink-0">
                             <ChatInput

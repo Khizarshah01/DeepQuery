@@ -15,7 +15,7 @@ export function Footer() {
 
             <span className="h-3 w-px bg-border/50" />
 
-            <span>© 2026 Purplexity</span>
+            <span>© 2026 DeepQuery</span>
         </div>
     );
 }

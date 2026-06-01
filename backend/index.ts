@@ -76,7 +76,7 @@ app.post('/ask', authMiddleware, async (req:AuthedRequest, res:Response) => {
     if (!conversationId) {
         const conversation = await prisma.conversation.create({
             data: {
-                userId: req.userId,
+                userId: req.userId as string,
                 title: userQuery.slice(0, 20),
                 slug: crypto.randomUUID(),
             }
@@ -103,8 +103,15 @@ app.post('/ask', authMiddleware, async (req:AuthedRequest, res:Response) => {
         }
     })
 
+    // Setup streaming headers
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+
+    res.write("<STATUS>Searching the web...</STATUS>\n");
+
     const webResponse = await searchWeb(userQuery);
     const webResults = webResponse.results;
+
+    res.write("<STATUS>Reasoning...</STATUS>\n");
 
     // llm request
     const prompt = PROMPT_TEMPLATE.replace("{{CONVERSATION_HISTORY}}", previousMessages || "").replace("{{WEB_SEARCH_RESULTS}}", JSON.stringify(webResults)).replace("{{USER_QUERY}}", userQuery);
@@ -135,32 +142,67 @@ app.post('/ask', authMiddleware, async (req:AuthedRequest, res:Response) => {
     }
 
     // parse final resposne and store  in db
-    let finalResponse;
+    let finalAnswerText = answer;
+    let followupsText = "";
+    
+    // Try to extract from JSON if it's JSON
     try {
-        finalResponse = JSON.parse(answer);
-        res.write(finalResponse.answer); // send final answer to clientside
-    }
-    catch (e) {
-        console.error("Failed to parse LLM response:", e);
-        return res.status(500).json({
-            message: "Failed to parse LLM response",
-        });
-    }
-
-    await prisma.message.create({
-        data: {
-            conversationId: conversationId,
-            content: finalResponse.answer,
-            role: "ASSISTANT",
+        let cleanAnswer = answer.replace(/```json/gi, "").replace(/```/g, "").trim();
+        let parsed = JSON.parse(cleanAnswer);
+        if (Array.isArray(parsed)) parsed = parsed[0];
+        
+        if (parsed && parsed.answer) finalAnswerText = parsed.answer;
+        else if (parsed && parsed.ANSWER) finalAnswerText = parsed.ANSWER;
+        
+        if (parsed && parsed.followup) followupsText = Array.isArray(parsed.followup) ? parsed.followup.join("\n") : parsed.followup;
+        else if (parsed && parsed.FOLLOWUP) followupsText = Array.isArray(parsed.FOLLOWUP) ? parsed.FOLLOWUP.join("\n") : parsed.FOLLOWUP;
+    } catch (e) {
+        // Not valid JSON (e.g., unescaped newlines). Try regex fallback.
+        const ansMatch = answer.match(/"ANSWER"\s*:\s*"([\s\S]*?)",?\s*"FOLLOWUP"/i) || answer.match(/"ANSWER"\s*:\s*"([\s\S]*?)"\s*\}/i);
+        if (ansMatch) {
+            finalAnswerText = (ansMatch[1] || "").replace(/\\n/g, '\n').replace(/\\"/g, '"');
         }
-    });
+        const folMatch = answer.match(/"FOLLOWUP"\s*:\s*"([\s\S]*?)"/i) || answer.match(/"FOLLOWUP"\s*:\s*(\[[\s\S]*?\])/i);
+        if (folMatch) {
+            followupsText = (folMatch[1] || "").replace(/\\n/g, '\n').replace(/\\"/g, '"');
+        }
+    }
+    
+    // Clean up <ANSWER> and <FOLLOWUP> tags if the model included them inside the string
+    const answerMatch = finalAnswerText.match(/<ANSWER>\s*([\s\S]*?)\s*<\/ANSWER>/);
+    if (answerMatch) {
+        finalAnswerText = answerMatch[1] || "";
+    }
+    
+    const followupMatch = finalAnswerText.match(/<FOLLOWUP>\s*([\s\S]*?)\s*<\/FOLLOWUP>/);
+    if (followupMatch) {
+        followupsText = followupMatch[1] || "";
+        finalAnswerText = finalAnswerText.replace(/<FOLLOWUP>\s*([\s\S]*?)\s*<\/FOLLOWUP>/g, "");
+    }
+    
+    res.write(finalAnswerText); // send final answer to clientside
+    if (followupsText) {
+        res.write(`\n<FOLLOWUP>\n${followupsText}\n</FOLLOWUP>\n`);
+    }
 
-    await prisma.conversation.update({
-        where: {
-            id: conversationId,
-        },
-        data: {}
-    });
+    try {
+        await prisma.message.create({
+            data: {
+                conversationId: conversationId,
+                content: finalAnswerText,
+                role: "ASSISTANT",
+            }
+        });
+
+        await prisma.conversation.update({
+            where: {
+                id: conversationId,
+            },
+            data: {}
+        });
+    } catch (dbError) {
+        console.error("Failed to save to db:", dbError);
+    }
 
     res.write(`\n<CONVERSATION_ID>${conversationId}</CONVERSATION_ID>\n`);
 
@@ -224,7 +266,7 @@ app.post('/research', authMiddleware, async(req:AuthedRequest,res:Response)=>{
 
 app.get('/research/status/:jobId', authMiddleware, async(req,res)=>{
     const job = await prisma.researchJob.findUnique({
-        where:{ id: req.params.jobId,}
+        where:{ id: req.params.jobId as string,}
     });
 
     if (!job){

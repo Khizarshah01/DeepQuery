@@ -9,9 +9,9 @@ export function Hero() {
                     Better then search
                 </div>
 
-                <h1 className="text-4xl font-light text-normal sm:text-5xl text-slate-900 dark:text-white">
+                <h1 className="text-4xl font-normal text-normal sm:text-5xl text-slate-900 dark:text-white">
                     Where knowledge{" "}
-                    <span className="italic">begins.</span>
+                    <span className="italic font-bold text-gray-900 dark:text-gray-400">begins.</span>
                 </h1>
             </div>
         </div>

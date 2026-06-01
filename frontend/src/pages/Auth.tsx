@@ -36,14 +36,14 @@ export default function Auth() {
                 <CardHeader className="space-y-1 text-center">
                     <CardTitle className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Welcome back</CardTitle>
                     <CardDescription className="text-slate-500 dark:text-gray-400">
-                        Sign in to your Purplexity account to continue
+                        Sign in to your DeepQuery account to continue
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="grid gap-4">
                     <Button 
                         variant="outline" 
                         onClick={() => login("google")}
-                        className="relative h-12 w-full justify-center text-base font-semibold bg-white text-black hover:bg-gray-200"
+                        className="relative h-12 w-full justify-center text-base font-semibold bg-white text-black hover:bg-gray-200 dark:text-white"
                     >
                         <GoogleIcon className="mr-2 h-5 w-5" />
                         Continue with Google
@@ -51,7 +51,7 @@ export default function Auth() {
                     <Button 
                         variant="outline" 
                         onClick={() => login("github")}
-                        className="relative h-12 w-full justify-center text-base font-semibold bg-slate-900 text-white border-none hover:bg-slate-800 dark:bg-[#24292e] dark:hover:bg-[#2f363d]"
+                        className="relative h-12 w-full justify-center text-base font-semibold bg-slate-900 text-white border-none hover:bg-slate-300  dark:bg-[#24292e] dark:hover:bg-[#2f363d]"
                     >
                         <Github className="mr-2 h-5 w-5" />
                         Continue with GitHub
