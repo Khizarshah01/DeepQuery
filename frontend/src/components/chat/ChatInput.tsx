@@ -5,6 +5,8 @@ type ChatInputProps = {
     setInput: React.Dispatch<React.SetStateAction<string>>;
     askQuestion: (question?: string) => void;
     isAsking: boolean;
+    deepResearch: boolean;
+    onDeepResearchChange: (value: boolean) => void;
 };
 
 export function ChatInput({
@@ -12,6 +14,8 @@ export function ChatInput({
     setInput,
     askQuestion,
     isAsking,
+    deepResearch,
+    onDeepResearchChange,
 }: ChatInputProps) {
     return (
         <div className="w-full max-w-2xl">
@@ -34,17 +38,28 @@ export function ChatInput({
                     <span className="text-xs text-slate-400 dark:text-white/30">
                         Press Enter to search
                     </span>
-                    <button
-                        disabled={!input.trim() || isAsking}
-                        onClick={() => askQuestion()}
-                        className="size-8 rounded-lg bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-white/90 disabled:bg-slate-200 dark:disabled:bg-white/10 text-white dark:text-black disabled:text-slate-400 dark:disabled:text-white/20 flex items-center justify-center transition-colors"
-                    >
-                        {isAsking ? (
-                            <Sparkles className="size-4 animate-pulse" />
-                        ) : (
-                            <ArrowUp className="size-4" />
-                        )}
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={() => onDeepResearchChange(!deepResearch)}
+                            className={`text-[10px] px-2.5 py-0.5 rounded-md font-medium transition-all ${deepResearch 
+                                ? 'bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:hover:bg-white/90 dark:text-black' 
+                                : 'bg-slate-100 hover:bg-slate-200 text-slate-500 dark:bg-white/10 dark:text-white/60 dark:hover:bg-white/20'
+                            }`}
+                        >
+                            Deep
+                        </button>
+                        <button
+                            disabled={!input.trim() || isAsking}
+                            onClick={() => askQuestion()}
+                            className="size-8 rounded-lg bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-white/90 disabled:bg-slate-200 dark:disabled:bg-white/10 text-white dark:text-black disabled:text-slate-400 dark:disabled:text-white/20 flex items-center justify-center transition-colors"
+                        >
+                            {isAsking ? (
+                                <Sparkles className="size-4 animate-pulse" />
+                            ) : (
+                                <ArrowUp className="size-4" />
+                            )}
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>

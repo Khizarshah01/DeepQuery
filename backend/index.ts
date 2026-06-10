@@ -66,6 +66,44 @@ app.get('/conversation/:conversationId', authMiddleware, async (req:AuthedReques
     res.json({ conversationHistory })
 });
 
+// Update conversation (e.g. rename title)
+app.patch('/conversation/:conversationId', authMiddleware, async (req:AuthedRequest, res:Response) => {
+    const { title } = req.body;
+    if (!title || typeof title !== 'string') {
+        return res.status(400).json({ message: "Title is required" });
+    }
+
+    const updated = await prisma.conversation.update({
+        where: {
+            id: req.params.conversationId,
+            userId: req.userId,
+        },
+        data: {
+            title: title.trim().slice(0, 60),
+        },
+    });
+    res.json({ conversation: updated });
+});
+
+// Delete conversation
+app.delete('/conversation/:conversationId', authMiddleware, async (req:AuthedRequest, res:Response) => {
+    const conversationId = req.params.conversationId;
+
+    // Delete messages first (to avoid FK issues)
+    await prisma.message.deleteMany({
+        where: { conversationId },
+    });
+
+    await prisma.conversation.delete({
+        where: {
+            id: conversationId,
+            userId: req.userId,
+        },
+    });
+
+    res.json({ success: true });
+});
+
 // ask question 
 app.post('/ask', authMiddleware, async (req:AuthedRequest, res:Response) => {
 
@@ -116,10 +154,10 @@ app.post('/ask', authMiddleware, async (req:AuthedRequest, res:Response) => {
     // llm request
     const prompt = PROMPT_TEMPLATE.replace("{{CONVERSATION_HISTORY}}", previousMessages || "").replace("{{WEB_SEARCH_RESULTS}}", JSON.stringify(webResults)).replace("{{USER_QUERY}}", userQuery);
     let response;
+    let answer = "";
     try {
-
         response = await ai.models.generateContentStream({
-            model: "gemini-3-flash-preview",
+            model: "gemini-2.5-flash",
             contents: prompt,
             config: {
                 systemInstruction: SYSTEM_PROMPT,
@@ -129,16 +167,13 @@ app.post('/ask', authMiddleware, async (req:AuthedRequest, res:Response) => {
             },
         });
 
+        for await (const chunk of response) {
+            answer += chunk.text ?? "";
+        }
     } catch (e) {
         console.error("Gemini API Error:", e);
-
-        return res.status(500).json({
-            message: "AI service temporarily unavailable",
-        });
-    }
-    let answer = "";
-    for await (const chunk of response) {
-        answer += chunk.text ?? "";
+        res.write("\n\nI apologize, but my core AI model is currently experiencing high demand. Please try asking your question again in a few moments.\n");
+        return res.end();
     }
 
     // parse final resposne and store  in db
@@ -245,6 +280,9 @@ app.post('/webhook/config', authMiddleware, async (req:AuthedRequest,res:Respons
 
 app.post('/research', authMiddleware, async(req:AuthedRequest,res:Response)=>{
     let { conversationId, userQuery } = req.body;
+    if (!userQuery) {
+        return res.status(400).json({message: "userQuery is required"});
+    }
     const jobRecord = await prisma.researchJob.create({
         data: {
             userId: req.userId,
@@ -264,14 +302,14 @@ app.post('/research', authMiddleware, async(req:AuthedRequest,res:Response)=>{
     res.status(202).json({message: "Research job added to queue", jobId: jobRecord.id})
 })
 
-app.get('/research/status/:jobId', authMiddleware, async(req,res)=>{
+app.get('/research/status/:jobId', authMiddleware, async(req:AuthedRequest,res:Response)=>{
     const job = await prisma.researchJob.findUnique({
         where:{ id: req.params.jobId as string,}
     });
 
-    if (!job){
+    if (!job || job.userId !== req.userId){
         return res.status(404).json({message:"Job not found"})
     }
-    res.json({status: job.status, result: job.result})
+    res.json({status: job.status, result: job.result, query: job.query})
 })
 app.listen(port);
