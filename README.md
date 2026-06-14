@@ -31,9 +31,8 @@ We aim to make research feel like a focused workspace rather than a one-off chat
 
 ```txt
 frontend/
-  React chat UI
+  React
   Supabase login
-  Conversation sidebar
   Research Mode polling
 
 backend/
@@ -54,6 +53,9 @@ Redis
 Postgres
   Users, conversations, messages, research jobs, webhook configs
 ```
+
+<img width="2166" height="1180" alt="Screenshot from 2026-06-14 22-46-54" src="https://github.com/user-attachments/assets/85bdd0e8-0f82-4bad-85d8-f286c98378e9" />
+
 
 ## Main API Flows
 
@@ -86,7 +88,7 @@ Research Mode is currently an async/background research workflow. It is not yet 
 ### 1. Clone and install
 
 ```bash
-git clone <your-repo-url>
+git clone <url>
 cd deepquery
 ```
 
@@ -155,12 +157,6 @@ Using Docker:
 docker run --name deepquery-redis -p 6379:6379 -d redis:7-alpine
 ```
 
-If the container already exists:
-
-```bash
-docker start deepquery-redis
-```
-
 ### 5. Run the backend API
 
 From `backend/`:
@@ -195,56 +191,6 @@ cd frontend
 bun run dev
 ```
 
-## Useful Commands
-
-Frontend build:
-
-```bash
-cd frontend
-bun run build
-```
-
-Backend start:
-
-```bash
-cd backend
-bun run start
-```
-
-Worker start:
-
-```bash
-cd backend
-bun run worker
-```
-
-Prisma Studio:
-
-```bash
-cd backend
-bunx prisma studio
-```
-
-## Project Structure
-
-```txt
-backend/
-  index.ts              API routes and chat endpoints
-  worker.ts             Background research worker
-  queue.ts              BullMQ queue setup
-  db.ts                 Prisma client
-  middleware.ts         Supabase auth middleware
-  prompt.ts             AI prompt templates
-  prisma/schema.prisma  Database schema
-
-frontend/
-  src/pages/Conversation.tsx        Main chat page
-  src/components/chat/ChatInput.tsx Chat input and Research Mode toggle
-  src/components/chat/ChatMessage.tsx Message rendering
-  src/components/sidebar/Sidebar.tsx Conversation sidebar
-  src/lib/supabase/                Supabase client setup
-```
-
 ## About DeepQuery
 
 DeepQuery is a production-minded research platform that delivers web-grounded answers, persistent conversation history, and scalable background research jobs. It is designed for teams and users who need reliable, composable research workflows.
@@ -252,14 +198,8 @@ DeepQuery is a production-minded research platform that delivers web-grounded an
 ## Current Limitations
 
 - Research Mode is async and queue-based, but not yet a true multi-step research agent.
-- Backend TypeScript strict checks still need cleanup in a few existing route/type areas.
-- Local setup requires several external services: Supabase, Postgres, Redis, Tavily, and Gemini.
 
 ## Future Improvements
 
 - Multi-step research planning with generated subqueries
 - Multiple Tavily searches per research job
-- Source ranking and citation display
-- Better retry/error handling for failed jobs
-- Deployment guide and screenshots
-- Full backend TypeScript cleanup
