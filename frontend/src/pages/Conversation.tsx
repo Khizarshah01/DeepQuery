@@ -158,6 +158,34 @@ export default function Conversation() {
             return;
         }
 
+        setChatError(null);
+        setInput("");
+        setIsAsking(true);
+        setIsSidebarOpen(false);
+        setMessages((current) => [
+            ...current,
+            { role: "user", content: cleanQuery },
+            { role: "assistant", content: "", status: "Starting deep research..." },
+        ]);
+
+        const updateResearchMessage = (content: string, status?: string) => {
+            setMessages((current) => {
+                const next = [...current];
+                const lastIndex = next.length - 1;
+                const last = next[lastIndex];
+
+                if (last?.role === "assistant") {
+                    next[lastIndex] = {
+                        role: "assistant",
+                        content,
+                        status,
+                    };
+                }
+
+                return next;
+            });
+        };
+
         try {
             const res = await axios.post(`${BACKEND_URL}/research`, {
                 conversationId,
@@ -167,13 +195,16 @@ export default function Conversation() {
             });
 
             const jobId = res.data.jobId;
+            if (res.data.conversationId) {
+                setConversationId(res.data.conversationId);
+            }
+
             setActiveResearchJob({ id: jobId, status: 'PENDING', query: cleanQuery });
-            setInput("");
-            setIsSidebarOpen(false);
+            let isResearchDone = false;
 
             // Start polling
             if (researchPollRef.current) clearInterval(researchPollRef.current);
-            researchPollRef.current = setInterval(async () => {
+            const pollResearch = async () => {
                 try {
                     const { data: { session: pollSession } } = await supabase.auth.getSession();
                     const pollJwt = pollSession?.access_token;
@@ -186,33 +217,43 @@ export default function Conversation() {
                     const { status, result } = statusRes.data;
                     setActiveResearchJob(prev => prev ? { ...prev, status, result } : null);
 
+                    if (status === 'PENDING') {
+                        updateResearchMessage("", "Queued for deep research...");
+                    } else if (status === 'PROCESSING') {
+                        updateResearchMessage("", "Deep research in progress...");
+                    }
+
                     if (status === 'COMPLETED' || status === 'FAILED') {
+                        isResearchDone = true;
                         if (researchPollRef.current) {
                             clearInterval(researchPollRef.current);
                             researchPollRef.current = null;
                         }
+
+                        if (status === 'COMPLETED') {
+                            updateResearchMessage(result || "Deep research completed, but no result was returned.");
+                            fetchConversations().catch(() => {});
+                        } else {
+                            updateResearchMessage("Deep research failed. Try again later.");
+                        }
+
+                        setActiveResearchJob(null);
+                        setIsAsking(false);
                     }
                 } catch (e) {
                     console.error("Research poll error");
                 }
-            }, 4000);
+            };
+
+            await pollResearch();
+            if (!isResearchDone) {
+                researchPollRef.current = setInterval(pollResearch, 4000);
+            }
         } catch (e) {
+            updateResearchMessage("Failed to start deep research.");
             setChatError("Failed to start deep research.");
-        }
-    }
-
-    function addResearchToChat() {
-        if (!activeResearchJob?.result) return;
-        const formatted = `**Deep Research Result for "${activeResearchJob.query}":**\n\n${activeResearchJob.result}`;
-        setMessages(prev => [...prev, { role: "assistant", content: formatted }]);
-        setActiveResearchJob(null);
-    }
-
-    function dismissResearch() {
-        setActiveResearchJob(null);
-        if (researchPollRef.current) {
-            clearInterval(researchPollRef.current);
-            researchPollRef.current = null;
+            setActiveResearchJob(null);
+            setIsAsking(false);
         }
     }
 
@@ -381,7 +422,7 @@ export default function Conversation() {
                     <div className="flex items-center gap-2 ml-auto">
                         {/* GitHub repo link */}
                         <a
-                            href="https://github.com/Khizarshah01/purplexity"
+                            href="https://github.com/Khizarshah01/deepquery"
                             target="_blank"
                             rel="noopener noreferrer"
                             className="size-9 rounded-lg flex items-center justify-center text-slate-500 dark:text-white/40 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors"
@@ -416,65 +457,6 @@ export default function Conversation() {
                         )}
                     </div>
                 </div>
-
-                {/* Deep Research Status Panel */}
-                {activeResearchJob && (
-                    <div className="mx-auto max-w-2xl w-full px-4 pt-4">
-                        <div className="rounded-2xl border border-purple-200 dark:border-purple-900 bg-purple-50 dark:bg-purple-950/50 p-4">
-                            <div className="flex items-center justify-between mb-2">
-                                <div className="flex items-center gap-2 text-sm font-semibold text-purple-700 dark:text-purple-300">
-                                    🔬 Deep Research
-                                </div>
-                                <button onClick={dismissResearch} className="text-xs text-purple-500 hover:text-purple-700">Dismiss</button>
-                            </div>
-                            <div className="text-sm text-purple-800 dark:text-purple-200 mb-1">
-                                Query: <span className="font-medium">"{activeResearchJob.query}"</span>
-                            </div>
-                            <div className="flex items-center gap-2 text-sm">
-                                <span>Status:</span>
-                                <span className={`font-medium px-2 py-0.5 rounded text-xs ${
-                                    activeResearchJob.status === 'COMPLETED' ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' :
-                                    activeResearchJob.status === 'FAILED' ? 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300' :
-                                    'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300'
-                                }`}>
-                                    {activeResearchJob.status}
-                                </span>
-                                {activeResearchJob.status !== 'COMPLETED' && activeResearchJob.status !== 'FAILED' && (
-                                    <span className="text-xs text-purple-500">Polling for updates...</span>
-                                )}
-                            </div>
-
-                            {activeResearchJob.status === 'COMPLETED' && activeResearchJob.result && (
-                                <div className="mt-3">
-                                    <div className="text-xs font-semibold mb-1 text-purple-600 dark:text-purple-400">Result:</div>
-                                    <div className="max-h-48 overflow-auto text-sm bg-white dark:bg-[#111] p-3 rounded-xl border border-purple-100 dark:border-purple-800 whitespace-pre-wrap">
-                                        {activeResearchJob.result}
-                                    </div>
-                                    <div className="flex gap-2 mt-2">
-                                        <button 
-                                            onClick={addResearchToChat}
-                                            className="px-3 py-1.5 text-xs bg-purple-600 hover:bg-purple-700 text-white rounded-lg"
-                                        >
-                                            Add to conversation
-                                        </button>
-                                        <button 
-                                            onClick={dismissResearch}
-                                            className="px-3 py-1.5 text-xs border border-purple-200 dark:border-purple-800 rounded-lg"
-                                        >
-                                            Dismiss
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
-
-                            {activeResearchJob.status === 'FAILED' && (
-                                <div className="mt-2 text-sm text-red-600 dark:text-red-400">
-                                    Research failed. Try again later.
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                )}
 
                 {/* Background Effects (Only on home screen) */}
                 {!isLoadingConversation && messages.length === 0 && (

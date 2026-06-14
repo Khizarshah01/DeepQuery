@@ -1,4 +1,4 @@
-# bun-react-tailwind-shadcn-template
+# DeepQuery Frontend
 
 To install dependencies:
 
@@ -17,5 +17,3 @@ To run for production:
 ```bash
 bun start
 ```
-
-This project was created using `bun init` in bun v1.3.6. [Bun](https://bun.com) is a fast all-in-one JavaScript runtime.

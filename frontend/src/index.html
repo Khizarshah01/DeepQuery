@@ -4,7 +4,25 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" type="image/svg+xml" href="./logo.svg" />
-    <title>Bun + React</title>
+    <title>DeepQuery</title>
+    <!-- Apply theme immediately to prevent flash (respects saved choice, falls back to system) -->
+    <script>
+      (function() {
+        try {
+          const saved = localStorage.getItem('theme');
+          if (saved === 'dark') {
+            document.documentElement.classList.add('dark');
+          } else if (saved === 'light') {
+            document.documentElement.classList.remove('dark');
+          } else {
+            // No saved preference → follow system
+            if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+              document.documentElement.classList.add('dark');
+            }
+          }
+        } catch (e) {}
+      })();
+    </script>
     <script type="module" src="./frontend.tsx" async></script>
   </head>
   <body>

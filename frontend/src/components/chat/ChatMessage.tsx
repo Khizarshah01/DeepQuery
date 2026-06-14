@@ -1,8 +1,10 @@
 import { cn } from "@/lib/utils";
-import { Bot, User, Globe, Loader2 } from "lucide-react";
+import { User, Globe, Loader2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import type { User as SupabaseUser } from "@supabase/supabase-js";
+import robotAvatar from "../../robot.jpeg";
 
 const TypewriterMarkdown = ({ content, role }: { content: string, role: string }) => {
     const [displayed, setDisplayed] = useState("");
@@ -45,9 +47,10 @@ type Message = {
 type ChatMessagesProps = {
     messages: Message[];
     onFollowupClick?: (question: string) => void;
+    user?: SupabaseUser | null;
 };
 
-export function ChatMessages({ messages, onFollowupClick }: ChatMessagesProps) {
+export function ChatMessages({ messages, onFollowupClick, user }: ChatMessagesProps) {
     const bottomRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -67,18 +70,24 @@ export function ChatMessages({ messages, onFollowupClick }: ChatMessagesProps) {
                     )}
                 >
                     {/* Avatar */}
-                    <div className={cn(
-                        "size-8 rounded-full flex items-center justify-center shrink-0 mt-1",
-                        message.role === "user"
-                            ? "bg-slate-900 dark:bg-white text-white dark:text-black"
-                            : "bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-white/60"
-                    )}>
-                        {message.role === "user" ? (
+                    {message.role === "user" && (user?.user_metadata?.avatar_url || user?.user_metadata?.picture) ? (
+                        <img
+                            src={user.user_metadata?.avatar_url || user.user_metadata?.picture}
+                            alt="You"
+                            className="size-8 rounded-full object-cover shrink-0 mt-1 border border-slate-200 dark:border-white/10"
+                            referrerPolicy="no-referrer"
+                        />
+                    ) : message.role === "assistant" ? (
+                        <img
+                            src={robotAvatar}
+                            alt="AI"
+                            className="size-8 rounded-full object-cover shrink-0 mt-1 border border-slate-200 dark:border-white/10"
+                        />
+                    ) : (
+                        <div className="size-8 rounded-full flex items-center justify-center shrink-0 mt-1 bg-slate-900 dark:bg-white text-white dark:text-black">
                             <User className="size-4" />
-                        ) : (
-                            <Bot className="size-4" />
-                        )}
-                    </div>
+                        </div>
+                    )}
 
                     <div className="flex flex-col gap-2 min-w-0 flex-1">
                         {(() => {
