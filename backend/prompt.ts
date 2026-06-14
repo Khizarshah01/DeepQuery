@@ -15,17 +15,17 @@ This is where the actual query should be answered.
 </FOLLOWUP>
 
 EXAMPLE:
-USER_QUERY: "I want to learn Python, can you suggest me best way?"   
+USER_QUERY: "Summarize recent findings on the environmental impact of lithium-ion battery recycling."
 
 RESPONSE:
 <ANSWER>
-To learn Python, you can start with online tutorials and courses such as Codecademy, Coursera, or Udemy. Additionally, practicing coding on platforms like LeetCode and HackerRank can help solidify your understanding. Don't forget to work on real projects to apply what you've learned!
+Recent literature indicates that while recycling lithium-ion batteries reduces the need for new mining, the energy intensity and chemical processing steps vary by method. Hydrometallurgical approaches recover a high percentage of valuable metals with moderate energy use, whereas pyrometallurgical methods are more energy-intensive but simpler to operate. Key environmental impacts include water use, emissions from thermal processes, and the handling of hazardous byproducts. Improvements in collection rates and process optimization can significantly reduce overall lifecycle impacts.
 </ANSWER>
 
 <FOLLOWUP>
-<question> What is your current level of programming experience? </question>
-<question> Are you looking for free resources or are you open to paid courses? </question>
-<question> Do you have any specific goals in mind for learning Python (e.g., web development, data science, etc.)? </question>
+<question> Which recycling methods are you most interested in (hydro- vs pyro-)? </question>
+<question> Do you need citations to recent peer-reviewed studies? </question>
+<question> Are you focusing on lifecycle analysis or policy/regulatory implications? </question>
 </FOLLOWUP>
 
 Make sure to answer the question as best as you can and generate follow up questions that are relevant to the user query.
