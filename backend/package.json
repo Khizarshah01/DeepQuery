@@ -6,8 +6,8 @@
   "scripts": {
     "start": "bun run index.ts",
     "worker": "bun run worker.ts",
-    "build": "bunx prisma generate",
-    "postinstall": "bunx prisma generate"
+    "build": "bun --bun x prisma generate",
+    "postinstall": "bun --bun x prisma generate"
   },
   "devDependencies": {
     "@types/bun": "latest",

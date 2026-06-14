@@ -31,6 +31,16 @@ try {
 app.use(cors());
 app.use(express.json());
 
+// Health check endpoint to keep Render and Supabase alive
+app.get('/health', async (req, res) => {
+    try {
+        await prisma.$queryRaw`SELECT 1`;
+        res.status(200).json({ status: 'ok', database: 'connected' });
+    } catch (e) {
+        res.status(500).json({ status: 'error', database: 'disconnected' });
+    }
+});
+
 // web search function
 async function searchWeb(query: string) {
     return await client.search(query, {

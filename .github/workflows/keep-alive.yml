@@ -1,0 +1,16 @@
+name: Keep Alive
+
+on:
+  schedule:
+    # Run every 14 minutes to prevent Render from sleeping (Render sleeps after 15 mins)
+    - cron: "*/14 * * * *"
+  workflow_dispatch: # Allows you to manually trigger the script if needed
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Backend Health Route
+        run: |
+          echo "Pinging backend to keep Render & Supabase awake..."
+          curl -s https://deepquery-z11t.onrender.com/health
