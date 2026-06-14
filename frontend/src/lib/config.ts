@@ -1,1 +1,1 @@
-export const BACKEND_URL = process.env.BUN_PUBLIC_BACKEND_URL || "http://localhost:3001";
+export const BACKEND_URL = (import.meta as any)?.env?.BUN_PUBLIC_BACKEND_URL;
