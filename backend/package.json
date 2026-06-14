@@ -5,7 +5,9 @@
   "private": true,
   "scripts": {
     "start": "bun run index.ts",
-    "worker": "bun run worker.ts"
+    "worker": "bun run worker.ts",
+    "build": "prisma generate",
+    "postinstall": "prisma generate"
   },
   "devDependencies": {
     "@types/bun": "latest",
