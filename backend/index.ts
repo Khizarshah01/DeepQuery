@@ -8,10 +8,21 @@ const client = tavily({ apiKey: process.env.TAVILY_API_KEY });
 import { GoogleGenAI } from "@google/genai";
 import { PROMPT_TEMPLATE, SYSTEM_PROMPT } from './prompt';
 import { prisma } from './db';
+import crypto from 'crypto';
 import type { Response } from "express";
-import { authMiddleware, AuthedRequest} from './middleware'
+import { authMiddleware } from './middleware'
+import type { AuthedRequest } from './middleware'
 import cors from "cors";
-import { deepResearchQueue } from './queue';
+
+// Optional: Redis queue for background jobs
+let deepResearchQueue: any = null;
+try {
+    const { deepResearchQueue: queue } = require('./queue');
+    deepResearchQueue = queue;
+    console.log('Redis queue initialized for research jobs');
+} catch (e) {
+    console.log('Redis queue not available; research endpoint will be disabled');
+}
 
 app.use(cors());
 app.use(express.json());
@@ -32,17 +43,27 @@ const outputSchema = z.object({
 });
 
 // conversation list 
+// Helper to normalize path/query params that can be string | string[] | undefined
+function normalizeParam(v: string | string[] | undefined): string | null {
+    if (!v) return null;
+    if (Array.isArray(v)) return v.length ? (v[0] ?? null) : null;
+    return v;
+}
+
 app.get('/conversation', authMiddleware, async (req:AuthedRequest, res:Response) => {
+    const userId = req.userId;
+    if (!userId) return res.status(401).json({ message: 'Unauthorized' });
+
     const conversations = await prisma.conversation.findMany({
         where: {
-            userId: req.userId,
+            userId: userId,
         },
         orderBy: {
             updatedAt: 'desc',
         }
     });
     res.json({
-        userId: (req as any).userId,
+        userId,
         conversations,
     });
 
@@ -50,10 +71,16 @@ app.get('/conversation', authMiddleware, async (req:AuthedRequest, res:Response)
 
 // conversation detail with conversationId for chats
 app.get('/conversation/:conversationId', authMiddleware, async (req:AuthedRequest, res:Response) => {
+    const userId = req.userId;
+    if (!userId) return res.status(401).json({ message: 'Unauthorized' });
+
+    const conversationId = normalizeParam(req.params.conversationId);
+    if (!conversationId) return res.status(400).json({ message: 'conversationId required' });
+
     const conversationHistory = await prisma.conversation.findFirst({
         where: {
-            id: req.params.conversationId,
-            userId: req.userId,
+            id: conversationId,
+            userId: userId,
         },
         include: {
             messages: {
@@ -73,11 +100,18 @@ app.patch('/conversation/:conversationId', authMiddleware, async (req:AuthedRequ
         return res.status(400).json({ message: "Title is required" });
     }
 
+    const userId = req.userId;
+    if (!userId) return res.status(401).json({ message: 'Unauthorized' });
+
+    const conversationId = normalizeParam(req.params.conversationId);
+    if (!conversationId) return res.status(400).json({ message: 'conversationId required' });
+
+    // Ensure the conversation belongs to the user
+    const existing = await prisma.conversation.findFirst({ where: { id: conversationId, userId } });
+    if (!existing) return res.status(404).json({ message: 'Conversation not found' });
+
     const updated = await prisma.conversation.update({
-        where: {
-            id: req.params.conversationId,
-            userId: req.userId,
-        },
+        where: { id: conversationId },
         data: {
             title: title.trim().slice(0, 60),
         },
@@ -87,7 +121,15 @@ app.patch('/conversation/:conversationId', authMiddleware, async (req:AuthedRequ
 
 // Delete conversation
 app.delete('/conversation/:conversationId', authMiddleware, async (req:AuthedRequest, res:Response) => {
-    const conversationId = req.params.conversationId;
+    const userId = req.userId;
+    if (!userId) return res.status(401).json({ message: 'Unauthorized' });
+
+    const conversationId = normalizeParam(req.params.conversationId);
+    if (!conversationId) return res.status(400).json({ message: 'conversationId required' });
+
+    // Ensure ownership
+    const existing = await prisma.conversation.findFirst({ where: { id: conversationId, userId } });
+    if (!existing) return res.status(404).json({ message: 'Conversation not found' });
 
     // Delete messages first (to avoid FK issues)
     await prisma.message.deleteMany({
@@ -95,10 +137,7 @@ app.delete('/conversation/:conversationId', authMiddleware, async (req:AuthedReq
     });
 
     await prisma.conversation.delete({
-        where: {
-            id: conversationId,
-            userId: req.userId,
-        },
+        where: { id: conversationId },
     });
 
     res.json({ success: true });
@@ -108,13 +147,23 @@ app.delete('/conversation/:conversationId', authMiddleware, async (req:AuthedReq
 app.post('/ask', authMiddleware, async (req:AuthedRequest, res:Response) => {
 
     // user query and conversation id 
-    let { conversationId, userQuery } = req.body;
+    let { conversationId: rawConversationId, userQuery } = req.body;
     let previousMessages = "";
+
+    const userId = req.userId;
+    if (!userId) return res.status(401).json({ message: 'Unauthorized' });
+
+    if (!userQuery || typeof userQuery !== 'string') {
+        return res.status(400).json({ message: 'userQuery is required' });
+    }
+
+    // normalize conversationId (might be string | string[])
+    let conversationId = normalizeParam(rawConversationId);
 
     if (!conversationId) {
         const conversation = await prisma.conversation.create({
             data: {
-                userId: req.userId as string,
+                userId: userId,
                 title: userQuery.slice(0, 20),
                 slug: crypto.randomUUID(),
             }
@@ -230,9 +279,7 @@ app.post('/ask', authMiddleware, async (req:AuthedRequest, res:Response) => {
         });
 
         await prisma.conversation.update({
-            where: {
-                id: conversationId,
-            },
+            where: { id: conversationId },
             data: {}
         });
     } catch (dbError) {
@@ -266,10 +313,12 @@ app.post('/ask', authMiddleware, async (req:AuthedRequest, res:Response) => {
 
 app.post('/webhook/config', authMiddleware, async (req:AuthedRequest,res:Response)=>{
     const { url } = req.body;
+    const userId = req.userId;
+    if (!userId) return res.status(401).json({ message: 'Unauthorized' });
 
     await prisma.webhookConfig.create({
         data: {
-            userId: req.userId,
+            userId: userId,
             url: url,
         }
     });
@@ -279,12 +328,14 @@ app.post('/webhook/config', authMiddleware, async (req:AuthedRequest,res:Respons
 
 
 app.post('/research', authMiddleware, async(req:AuthedRequest,res:Response)=>{
-    let { conversationId, userQuery } = req.body;
-    if (!userQuery) {
+    let { conversationId: rawConversationId, userQuery } = req.body;
+    if (!userQuery || typeof userQuery !== 'string') {
         return res.status(400).json({message: "userQuery is required"});
     }
-    const userId = req.userId as string;
-    let targetConversationId = typeof conversationId === "string" ? conversationId : null;
+    const userId = req.userId;
+    if (!userId) return res.status(401).json({ message: 'Unauthorized' });
+
+    let targetConversationId = normalizeParam(rawConversationId);
 
     if (targetConversationId) {
         const conversation = await prisma.conversation.findFirst({
@@ -316,6 +367,10 @@ app.post('/research', authMiddleware, async(req:AuthedRequest,res:Response)=>{
         },
     });
 
+    if (!deepResearchQueue) {
+        return res.status(503).json({ message: "Research feature is not available" });
+    }
+
     const jobRecord = await prisma.researchJob.create({
         data: {
             userId,
@@ -336,11 +391,15 @@ app.post('/research', authMiddleware, async(req:AuthedRequest,res:Response)=>{
 })
 
 app.get('/research/status/:jobId', authMiddleware, async(req:AuthedRequest,res:Response)=>{
-    const job = await prisma.researchJob.findUnique({
-        where:{ id: req.params.jobId as string,}
-    });
+    const userId = req.userId;
+    if (!userId) return res.status(401).json({ message: 'Unauthorized' });
 
-    if (!job || job.userId !== req.userId){
+    const jobId = normalizeParam(req.params.jobId);
+    if (!jobId) return res.status(400).json({ message: 'jobId required' });
+
+    const job = await prisma.researchJob.findUnique({ where: { id: jobId } });
+
+    if (!job || job.userId !== userId){
         return res.status(404).json({message:"Job not found"})
     }
     res.json({status: job.status, result: job.result, query: job.query})

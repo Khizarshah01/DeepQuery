@@ -171,9 +171,10 @@ export const deepResearchWorker = new Worker('DeepResearch', async (job: Job) =>
         throw error;
     }
 }, { 
-    connection,
+    // cast to any to avoid type mismatch between ioredis and bullmq types in this environment
+    connection: connection as any,
     concurrency: 5, // Process up to 5 jobs concurrently
-});
+} as any);
 
 deepResearchWorker.on('completed', (job) => {
     console.log(`Job ${job.id} has completed successfully!`);
