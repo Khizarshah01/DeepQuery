@@ -283,11 +283,44 @@ app.post('/research', authMiddleware, async(req:AuthedRequest,res:Response)=>{
     if (!userQuery) {
         return res.status(400).json({message: "userQuery is required"});
     }
+    const userId = req.userId as string;
+    let targetConversationId = typeof conversationId === "string" ? conversationId : null;
+
+    if (targetConversationId) {
+        const conversation = await prisma.conversation.findFirst({
+            where: {
+                id: targetConversationId,
+                userId,
+            },
+        });
+
+        if (!conversation) {
+            return res.status(404).json({ message: "Conversation not found" });
+        }
+    } else {
+        const conversation = await prisma.conversation.create({
+            data: {
+                userId,
+                title: userQuery.slice(0, 20),
+                slug: crypto.randomUUID(),
+            },
+        });
+        targetConversationId = conversation.id;
+    }
+
+    await prisma.message.create({
+        data: {
+            conversationId: targetConversationId,
+            content: userQuery,
+            role: "USER",
+        },
+    });
+
     const jobRecord = await prisma.researchJob.create({
         data: {
-            userId: req.userId,
+            userId,
             query: userQuery,
-            conversationId: conversationId || null,
+            conversationId: targetConversationId,
             status: "PENDING",
         }
     });
@@ -295,11 +328,11 @@ app.post('/research', authMiddleware, async(req:AuthedRequest,res:Response)=>{
     await deepResearchQueue.add('deep-research-task', {
         jobId: jobRecord.id,
         query: userQuery,
-        userId: req.userId,
-        conversationId: conversationId || null,
+        userId,
+        conversationId: targetConversationId,
     })
 
-    res.status(202).json({message: "Research job added to queue", jobId: jobRecord.id})
+    res.status(202).json({message: "Research job added to queue", jobId: jobRecord.id, conversationId: targetConversationId})
 })
 
 app.get('/research/status/:jobId', authMiddleware, async(req:AuthedRequest,res:Response)=>{

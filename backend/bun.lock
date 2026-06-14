@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "backend",
+      "name": "deepquery-backend",
       "dependencies": {
         "@google/genai": "^2.0.1",
         "@prisma/adapter-pg": "^7.8.0",

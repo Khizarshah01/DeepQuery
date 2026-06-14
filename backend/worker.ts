@@ -18,6 +18,55 @@ const outputSchema = z.object({
     answer: z.string(),
 });
 
+function parseResearchResponse(answerStr: string) {
+    let finalResult = answerStr;
+    let followupsText = "";
+
+    try {
+        let cleanAnswer = answerStr.replace(/```json/gi, "").replace(/```/g, "").trim();
+        let parsed = JSON.parse(cleanAnswer);
+        if (Array.isArray(parsed)) parsed = parsed[0];
+
+        if (parsed && typeof parsed.answer === "string") finalResult = parsed.answer;
+        else if (parsed && typeof parsed.ANSWER === "string") finalResult = parsed.ANSWER;
+
+        if (parsed && parsed.followup) followupsText = Array.isArray(parsed.followup) ? parsed.followup.join("\n") : String(parsed.followup);
+        else if (parsed && parsed.FOLLOWUP) followupsText = Array.isArray(parsed.FOLLOWUP) ? parsed.FOLLOWUP.join("\n") : String(parsed.FOLLOWUP);
+    } catch(e) {
+        const ansMatch = answerStr.match(/"ANSWER"\s*:\s*"([\s\S]*?)",?\s*"FOLLOWUP"/i) || answerStr.match(/"ANSWER"\s*:\s*"([\s\S]*?)"\s*\}/i);
+        if (ansMatch) {
+            finalResult = (ansMatch[1] || "").replace(/\\n/g, '\n').replace(/\\"/g, '"');
+        }
+
+        const folMatch = answerStr.match(/"FOLLOWUP"\s*:\s*"([\s\S]*?)"/i) || answerStr.match(/"FOLLOWUP"\s*:\s*(\[[\s\S]*?\])/i);
+        if (folMatch) {
+            followupsText = (folMatch[1] || "").replace(/\\n/g, '\n').replace(/\\"/g, '"');
+        }
+    }
+
+    const answerMatch = finalResult.match(/<ANSWER>\s*([\s\S]*?)\s*<\/ANSWER>/i);
+    if (answerMatch) {
+        finalResult = answerMatch[1] || "";
+    }
+
+    const followupMatch = finalResult.match(/<FOLLOWUP>\s*([\s\S]*?)\s*<\/FOLLOWUP>/i);
+    if (followupMatch) {
+        followupsText = followupMatch[1] || "";
+        finalResult = finalResult.replace(/<FOLLOWUP>\s*([\s\S]*?)\s*<\/FOLLOWUP>/gi, "");
+    }
+
+    finalResult = finalResult.trim();
+    if (!finalResult) {
+        finalResult = answerStr.trim() || "Deep research completed, but no answer text was returned.";
+    }
+
+    if (followupsText.trim()) {
+        finalResult += `\n<FOLLOWUP>\n${followupsText.trim()}\n</FOLLOWUP>`;
+    }
+
+    return finalResult;
+}
+
 export const deepResearchWorker = new Worker('DeepResearch', async (job: Job) => {
     const { jobId, query, userId, conversationId } = job.data;
     
@@ -66,12 +115,21 @@ export const deepResearchWorker = new Worker('DeepResearch', async (job: Job) =>
             answerStr += chunk.text ?? "";
         }
 
-        let finalResult = "";
-        try {
-            const finalResponse = JSON.parse(answerStr);
-            finalResult = finalResponse.answer;
-        } catch(e) {
-            finalResult = answerStr; // fallback if JSON parsing fails
+        const finalResult = parseResearchResponse(answerStr);
+
+        if (conversationId) {
+            await prisma.message.create({
+                data: {
+                    conversationId,
+                    content: finalResult,
+                    role: 'ASSISTANT',
+                }
+            });
+
+            await prisma.conversation.update({
+                where: { id: conversationId },
+                data: {}
+            });
         }
 
         // 4. Update status to COMPLETED and save result
