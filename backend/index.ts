@@ -17,9 +17,13 @@ import cors from "cors";
 // Optional: Redis queue for background jobs
 let deepResearchQueue: any = null;
 try {
-    const { deepResearchQueue: queue } = require('./queue');
-    deepResearchQueue = queue;
-    console.log('Redis queue initialized for research jobs');
+    const queue = require('./queue');
+    deepResearchQueue = queue.deepResearchQueue;
+    if (deepResearchQueue) {
+        console.log('Redis queue initialized for research jobs');
+    } else {
+        console.log('Redis queue not available; research endpoint will be disabled');
+    }
 } catch (e) {
     console.log('Redis queue not available; research endpoint will be disabled');
 }
@@ -296,10 +300,8 @@ app.post('/ask', authMiddleware, async (req:AuthedRequest, res:Response) => {
 
     res.write("\n</SOURCES>\n");
 
-
     res.end(); // streaming end
 })
-
 
 // follow up question
 // app.post('/ask/followup', authMiddleware, async (req, res) => {
@@ -325,7 +327,6 @@ app.post('/webhook/config', authMiddleware, async (req:AuthedRequest,res:Respons
 
     res.json({ message: "Webhook configured successfully" })
 })
-
 
 app.post('/research', authMiddleware, async(req:AuthedRequest,res:Response)=>{
     let { conversationId: rawConversationId, userQuery } = req.body;
