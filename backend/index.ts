@@ -31,14 +31,41 @@ try {
 app.use(cors());
 app.use(express.json());
 
-// Health check endpoint to keep Render and Supabase alive
+// Health check endpoint that also keeps the free-tier services awake.
+// Render sleeps after ~15 min of inactivity; Supabase pauses after ~7 days.
+// A raw Postgres query alone does NOT reliably prevent Supabase's auto-pause,
+// so we also hit the Supabase Auth API directly. A single ping to this route
+// therefore generates activity on both Render and Supabase.
 app.get('/health', async (req, res) => {
+    let database = 'disconnected';
+    let supabase = 'unreached';
+
     try {
         await prisma.$queryRaw`SELECT 1`;
-        res.status(200).json({ status: 'ok', database: 'connected' });
+        database = 'connected';
     } catch (e) {
-        res.status(500).json({ status: 'error', database: 'disconnected' });
+        console.error('Health check DB error:', e);
     }
+
+    try {
+        const supabaseUrl = process.env.PUBLIC_SUPABASE_URL;
+        const supabaseKey = process.env.SECRET_KEY_BASE;
+        if (supabaseUrl && supabaseKey) {
+            const resp = await fetch(`${supabaseUrl}/auth/v1/settings`, {
+                headers: { apikey: supabaseKey },
+            });
+            if (resp.ok) supabase = 'reached';
+        }
+    } catch (e) {
+        console.error('Health check Supabase ping error:', e);
+    }
+
+    const healthy = database === 'connected';
+    res.status(healthy ? 200 : 500).json({
+        status: healthy ? 'ok' : 'error',
+        database,
+        supabase,
+    });
 });
 
 // web search function

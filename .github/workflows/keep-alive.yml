@@ -2,15 +2,22 @@ name: Keep Alive
 
 on:
   schedule:
-    # Run every 14 minutes to prevent Render from sleeping (Render sleeps after 15 mins)
-    - cron: "*/14 * * * *"
-  workflow_dispatch: # Allows you to manually trigger the script if needed
+    # Every 10 minutes. Render sleeps after ~15 min of inactivity, and the
+    # /health route also pings the Supabase Auth API, so this single request
+    # keeps both Render and Supabase (7-day auto-pause) awake.
+    # NOTE: GitHub scheduled workflows are best-effort (often delayed) and are
+    # auto-disabled after 60 days without repo activity. For a more reliable
+    # keep-alive, also add an UptimeRobot monitor on the same /health URL.
+    - cron: "*/10 * * * *"
+  workflow_dispatch: # Allows manual triggering
 
 jobs:
   ping:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping Backend Health Route
+      - name: Ping backend health route (wakes Render + pings Supabase)
         run: |
           echo "Pinging backend to keep Render & Supabase awake..."
-          curl -s https://deepquery-z11t.onrender.com/health
+          # --max-time 90 tolerates Render cold starts; retry on failure
+          curl -sS --max-time 90 --retry 3 --retry-delay 20 \
+            https://deepquery-z11t.onrender.com/health

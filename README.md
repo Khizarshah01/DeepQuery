@@ -1,8 +1,8 @@
 # DeepQuery
 
-DeepQuery is our full-stack AI research chat product for turning web context into structured, conversational answers. It combines authenticated conversations, live web search, streamed AI responses, and asynchronous research jobs powered by a Redis-backed worker queue.
+DeepQuery is a full-stack AI research chat app for turning web context into structured, conversational answers. It combines authenticated conversations, live web search, streamed AI responses, and asynchronous research jobs powered by a Redis-backed worker queue.
 
-We aim to make research feel like a focused workspace rather than a one-off chatbot: users can ask quick questions, continue earlier threads, and send longer research tasks into a background worker without leaving the chat.
+I built it to make research feel like a focused workspace rather than a one-off chatbot: users can ask quick questions, continue earlier threads, and send longer research tasks into a background worker without leaving the chat.
 
 ## Features
 
@@ -193,7 +193,7 @@ bun run dev
 
 ## About DeepQuery
 
-DeepQuery is a production-minded research platform that delivers web-grounded answers, persistent conversation history, and scalable background research jobs. It is designed for teams and users who need reliable, composable research workflows.
+DeepQuery is a production-minded research platform that delivers web-grounded answers, persistent conversation history, and scalable background research jobs, built for anyone who needs reliable, composable research workflows.
 
 ## Current Limitations
 
