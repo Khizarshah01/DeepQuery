@@ -4,7 +4,7 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "start": "bun run index.ts",
+    "start": "bun --bun x prisma db push && bun run index.ts",
     "worker": "bun run worker.ts",
     "build": "bun --bun x prisma generate",
     "postinstall": "bun --bun x prisma generate"

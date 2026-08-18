@@ -7,6 +7,8 @@ type ChatInputProps = {
     isAsking: boolean;
     deepResearch: boolean;
     onDeepResearchChange: (value: boolean) => void;
+    allowDeepSearch?: boolean;
+    onDeepSearchUnavailable?: () => void;
 };
 
 export function ChatInput({
@@ -16,6 +18,8 @@ export function ChatInput({
     isAsking,
     deepResearch,
     onDeepResearchChange,
+    allowDeepSearch = true,
+    onDeepSearchUnavailable,
 }: ChatInputProps) {
     return (
         <div className="w-full max-w-2xl">
@@ -40,10 +44,19 @@ export function ChatInput({
                     </span>
                     <div className="flex items-center gap-2">
                         <button
-                            onClick={() => onDeepResearchChange(!deepResearch)}
-                            className={`text-[13px] px-2.5 py-1.5 rounded-md font-medium transition-all ${deepResearch 
-                                ? 'bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:hover:bg-white/90 dark:text-black' 
-                                : 'bg-slate-100 hover:bg-slate-200 text-slate-500 dark:bg-white/10 dark:text-white/60 dark:hover:bg-white/20'
+                            onClick={() => {
+                                if (!allowDeepSearch) {
+                                    onDeepSearchUnavailable?.();
+                                    return;
+                                }
+                                onDeepResearchChange(!deepResearch);
+                            }}
+                            className={`text-[13px] px-2.5 py-1.5 rounded-md font-medium transition-all ${
+                                !allowDeepSearch
+                                    ? "bg-slate-100 text-slate-400 dark:bg-white/10 dark:text-white/35"
+                                    : deepResearch
+                                        ? "bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:hover:bg-white/90 dark:text-black"
+                                        : "bg-slate-100 hover:bg-slate-200 text-slate-500 dark:bg-white/10 dark:text-white/60 dark:hover:bg-white/20"
                             }`}
                         >
                             Deep Search

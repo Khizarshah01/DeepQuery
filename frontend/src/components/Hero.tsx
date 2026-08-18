@@ -11,11 +11,11 @@ export function Hero() {
                         className="text-slate-600 dark:text-white/60 mx-0 max-w-none"
                         shimmerWidth={70}
                     >
-                        Better then search
+                        Better than search
                     </AnimatedShinyText>
                 </div>
 
-                <h1 className="text-4xl font-normal text-normal sm:text-5xl text-slate-900 dark:text-white">
+                <h1 className="text-4xl font-normal sm:text-5xl text-slate-900 dark:text-white">
                     Where knowledge{" "}
                     <span className="italic font-bold text-gray-900 dark:text-gray-400">begins.</span>
                 </h1>

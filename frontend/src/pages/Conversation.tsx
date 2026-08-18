@@ -1,9 +1,10 @@
-import { createClient } from "@/lib/supabase/client";
+import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import type { User } from "@supabase/supabase-js";
 import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router";
+import { useLocation, useNavigate } from "react-router";
 import axios from "axios";
 import { BACKEND_URL } from "@/lib/config";
+import { clearLocalSession, getLocalToken, getLocalUser, isLocalHost, LIVE_DEEP_SEARCH_NOTICE, REPO_URL, startLocalSession } from "../lib/localSession";
 import { ChatMessages } from "../components/chat/ChatMessage";
 import { Suggestions } from "../components/chat/Suggestions";
 import { Hero } from "../components/Hero";
@@ -18,7 +19,7 @@ interface Conversation {
     updatedAt: string;
 }
 
-const supabase = createClient();
+const supabase = hasSupabaseConfig() ? createClient() : null;
 
 export default function Conversation() {
     const [user, setUser] = useState<User | null>(null);
@@ -26,6 +27,7 @@ export default function Conversation() {
     const [messages, setMessages] = useState<{ role: "user" | "assistant"; content: string; status?: string }[]>([]);
     const [isAsking, setIsAsking] = useState(false);
     const [chatError, setChatError] = useState<string | null>(null);
+    const [liveNotice, setLiveNotice] = useState<string | null>(null);
     const [isDark, setIsDark] = useState(() => {
         // Initialize from saved preference or whatever the early script already applied
         const saved = localStorage.getItem('theme');
@@ -42,16 +44,59 @@ export default function Conversation() {
     const researchPollRef = useRef<any>(null);
     const [useDeepResearch, setUseDeepResearch] = useState(false);
     const navigate = useNavigate();
+    const location = useLocation();
+    const localMode = location.pathname === "/local";
+
+    async function getJwt() {
+        if (localMode) return getLocalToken();
+        if (!supabase) return null;
+        const { data: { session } } = await supabase.auth.getSession();
+        return session?.access_token ?? null;
+    }
 
     useEffect(() => {
-        async function getInfo() {
-            const { data } = await supabase.auth.getUser();
-            if (data.user) setUser(data.user);
+        let cancelled = false;
+
+        if (localMode) {
+            if (!isLocalHost()) {
+                navigate("/");
+                return;
+            }
+
+            const existing = getLocalUser();
+            if (existing && getLocalToken()) {
+                setUser(existing);
+                return;
+            }
+
+            startLocalSession()
+                .then((localUser) => {
+                    if (!cancelled) setUser(localUser);
+                })
+                .catch((error) => {
+                    console.error("Local session failed:", error);
+                    if (!cancelled) setChatError("Could not start local test mode. Is the backend running on http://localhost:3001?");
+                });
+            return () => {
+                cancelled = true;
+            };
         }
-        getInfo();
-        // Theme is already applied by the inline script in index.html + localStorage.
-        // We only sync user here.
-    }, []);
+
+        if (!supabase) return;
+
+        supabase.auth.getSession().then(({ data }) => {
+            if (!cancelled) setUser(data.session?.user ?? null);
+        });
+
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+            setUser(session?.user ?? null);
+        });
+
+        return () => {
+            cancelled = true;
+            subscription.unsubscribe();
+        };
+    }, [localMode, navigate]);
 
     // Fetch conversations when user becomes available (in addition to the sync effect)
     useEffect(() => {
@@ -77,8 +122,7 @@ export default function Conversation() {
             if (user) {
                 if (syncedUserId.current === user.id) return;
 
-                const { data: { session } } = await supabase.auth.getSession();
-                const jwt = session?.access_token;
+                const jwt = await getJwt();
                 if (!jwt) return;
 
                 try {
@@ -98,7 +142,15 @@ export default function Conversation() {
     }, [user]);
 
     const handleSignOut = async () => {
-        await supabase.auth.signOut();
+        if (localMode) {
+            clearLocalSession();
+            setUser(null);
+            navigate("/");
+            return;
+        }
+        if (supabase) {
+            await supabase.auth.signOut();
+        }
         setUser(null);
         navigate("/auth");
     };
@@ -118,8 +170,7 @@ export default function Conversation() {
 
     const fetchConversations = async () => {
         if (!user) return;
-        const { data: { session } } = await supabase.auth.getSession();
-        const jwt = session?.access_token;
+        const jwt = await getJwt();
         if (!jwt) return;
 
         try {
@@ -151,9 +202,12 @@ export default function Conversation() {
         const cleanQuery = query.trim();
         if (!cleanQuery || isAsking || activeResearchJob) return;
 
-        const { data: { session } } = await supabase.auth.getSession();
-        const jwt = session?.access_token;
+        const jwt = await getJwt();
         if (!jwt) {
+            if (localMode) {
+                setChatError("Local test session is not ready yet.");
+                return;
+            }
             navigate("/auth");
             return;
         }
@@ -206,8 +260,7 @@ export default function Conversation() {
             if (researchPollRef.current) clearInterval(researchPollRef.current);
             const pollResearch = async () => {
                 try {
-                    const { data: { session: pollSession } } = await supabase.auth.getSession();
-                    const pollJwt = pollSession?.access_token;
+                    const pollJwt = await getJwt();
                     if (!pollJwt) return;
 
                     const statusRes = await axios.get(`${BACKEND_URL}/research/status/${jobId}`, {
@@ -250,17 +303,40 @@ export default function Conversation() {
                 researchPollRef.current = setInterval(pollResearch, 4000);
             }
         } catch (e) {
-            updateResearchMessage("Failed to start deep research.");
-            setChatError("Failed to start deep research.");
+            const axiosError = e as {
+                response?: { status?: number; data?: { message?: string; error?: string } };
+                message?: string;
+            };
+            const status = axiosError.response?.status;
+            const detail =
+                axiosError.response?.data?.message ||
+                axiosError.response?.data?.error ||
+                axiosError.message ||
+                "Failed to start deep research.";
+            const message = status
+                ? `Deep research failed (${status}): ${detail}`
+                : `Deep research failed: ${detail}`;
+            console.error("Deep research start error", e);
+            updateResearchMessage(message);
+            setChatError(message);
             setActiveResearchJob(null);
             setIsAsking(false);
         }
     }
 
+    const showLiveDeepSearchNotice = () => {
+        setLiveNotice(LIVE_DEEP_SEARCH_NOTICE);
+        setUseDeepResearch(false);
+    };
+
     const handleSend = (question = input) => {
         if (useDeepResearch) {
+            if (!isLocalHost()) {
+                showLiveDeepSearchNotice();
+                return;
+            }
             startDeepResearch(question);
-            setUseDeepResearch(false); // reset mode after this deep request
+            setUseDeepResearch(false);
         } else {
             askQuestion(question);
         }
@@ -268,8 +344,7 @@ export default function Conversation() {
 
     const loadConversation = async (id: string) => {
         if (!user) return;
-        const { data: { session } } = await supabase.auth.getSession();
-        const jwt = session?.access_token;
+        const jwt = await getJwt();
         if (!jwt) return;
 
         setIsLoadingConversation(true);
@@ -309,9 +384,12 @@ export default function Conversation() {
         const cleanQuestion = question.trim();
         if (!cleanQuestion || isAsking) return;
 
-        const { data: { session } } = await supabase.auth.getSession();
-        const jwt = session?.access_token;
+        const jwt = await getJwt();
         if (!jwt) {
+            if (localMode) {
+                setChatError("Local test session is not ready yet.");
+                return;
+            }
             navigate("/auth");
             return;
         }
@@ -407,6 +485,19 @@ export default function Conversation() {
             )}
 
             <main className="flex-1 flex flex-col relative overflow-hidden">
+                {localMode && (
+                    <div className="px-4 py-2 text-center text-xs font-medium bg-emerald-500/15 text-emerald-800 dark:text-emerald-200">
+                        Local test mode — no Google login. Chat and Deep Search are fully available here.
+                    </div>
+                )}
+                {!localMode && !isLocalHost() && (
+                    <div className="px-4 py-2 text-center text-xs font-medium bg-slate-100 text-slate-600 dark:bg-white/5 dark:text-white/50">
+                        Live demo — sign in with Google or GitHub. Deep Search runs in a local clone.{" "}
+                        <a href={REPO_URL} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-slate-900 dark:hover:text-white">
+                            View the repo
+                        </a>
+                    </div>
+                )}
                 
                 {/* Top bar with menu button and auth */}
                 <div className="flex items-center justify-between px-4 py-3 shrink-0">
@@ -453,6 +544,14 @@ export default function Conversation() {
                                 >
                                     Sign up
                                 </button>
+                                {isLocalHost() && (
+                                    <button
+                                        onClick={() => navigate("/local")}
+                                        className="px-4 py-1.5 rounded-lg text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-500 transition-colors"
+                                    >
+                                        Skip login
+                                    </button>
+                                )}
                             </>
                         )}
                     </div>
@@ -486,6 +585,8 @@ export default function Conversation() {
                                 isAsking={isAsking}
                                 deepResearch={useDeepResearch}
                                 onDeepResearchChange={setUseDeepResearch}
+                                allowDeepSearch={isLocalHost()}
+                                onDeepSearchUnavailable={showLiveDeepSearchNotice}
                             />
                             <Suggestions askQuestion={handleSend} />
                         </div>
@@ -503,6 +604,8 @@ export default function Conversation() {
                                 isAsking={isAsking}
                                 deepResearch={useDeepResearch}
                                 onDeepResearchChange={setUseDeepResearch}
+                                allowDeepSearch={isLocalHost()}
+                                onDeepSearchUnavailable={showLiveDeepSearchNotice}
                             />
                         </div>
                     </div>
@@ -516,6 +619,32 @@ export default function Conversation() {
                 )}
             </main>
             
+            {!hasSupabaseConfig() && (
+               <div className="fixed bottom-20 left-1/2 transform -translate-x-1/2 max-w-lg rounded-xl border border-amber-300/40 bg-amber-50 dark:bg-amber-500/10 px-4 py-3 text-sm text-amber-800 dark:text-amber-200 z-50">
+                  Add your Supabase keys to <code>frontend/.env</code> (see <code>frontend/.env.example</code>) before signing in or chatting.
+               </div>
+            )}
+
+            {liveNotice && (
+               <div className="fixed bottom-20 left-1/2 transform -translate-x-1/2 max-w-lg rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-[#161616] px-4 py-3 text-sm text-slate-700 dark:text-white/80 shadow-lg z-50">
+                  <p>{liveNotice}</p>
+                  <a
+                    href={REPO_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-2 inline-block font-medium text-slate-900 dark:text-white underline underline-offset-2"
+                  >
+                    Clone the repo on GitHub
+                  </a>
+                  <button
+                    onClick={() => setLiveNotice(null)}
+                    className="ml-3 text-xs text-slate-400 hover:text-slate-600 dark:hover:text-white/70"
+                  >
+                    Dismiss
+                  </button>
+               </div>
+            )}
+
             {chatError && (
                <div className="fixed bottom-20 left-1/2 transform -translate-x-1/2 rounded-xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive z-50">
                   {chatError}

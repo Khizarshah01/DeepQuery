@@ -87,3 +87,13 @@ enum JobStatus {
   COMPLETED
   FAILED
 }
+
+// Dedicated table so scheduled /health pings count as real Supabase activity.
+// A raw SELECT 1 is not enough to reliably prevent the free-tier 7-day pause.
+model KeepAlive {
+  id        String   @id @default(uuid())
+  name      String
+  createdAt DateTime @default(now())
+
+  @@map("keep_alive")
+}

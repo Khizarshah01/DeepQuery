@@ -6,10 +6,14 @@ let deepResearchQueue: Queue | null = null;
 
 try {
     // Usually Redis runs on localhost:6379 in development
-    connection = new Redis(process.env.REDIS_URL || 'redis://127.0.0.1:6379', {
+    const redisUrl = process.env.REDIS_URL || 'redis://127.0.0.1:6379';
+    connection = new Redis(redisUrl, {
         maxRetriesPerRequest: null,
-        retryStrategy: () => null, // Disable retries to fail fast
-        lazyConnect: true, // Don't connect immediately
+        retryStrategy: (times) => Math.min(times * 500, 5000),
+        lazyConnect: true,
+    });
+    connection.on('error', (err) => {
+        console.warn(`Redis connection error (${redisUrl}):`, err.message);
     });
     
     // Try to connect

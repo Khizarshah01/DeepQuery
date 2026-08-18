@@ -7,11 +7,31 @@ const { zodToJsonSchema } = require("zod-to-json-schema");
 const { tavily } = require('@tavily/core');
 import { SYSTEM_PROMPT, PROMPT_TEMPLATE } from './prompt';
 
-const connection = new Redis(process.env.REDIS_URL || 'redis://127.0.0.1:6379', {
-    maxRetriesPerRequest: null
+const redisUrl = process.env.REDIS_URL || 'redis://127.0.0.1:6379';
+const connection = new Redis(redisUrl, {
+    maxRetriesPerRequest: null,
+    retryStrategy: (times) => Math.min(times * 500, 5000),
 });
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-const tavilyClient = tavily({ apiKey: process.env.TAVILY_API_KEY });
+
+connection.on('error', (err) => {
+    console.error(`Redis connection error (${redisUrl}):`, err.message);
+});
+
+function getGeminiClient() {
+    const apiKey = process.env.GEMINI_API_KEY?.trim();
+    if (!apiKey) {
+        throw new Error("Missing GEMINI_API_KEY. Add it to backend/.env");
+    }
+    return new GoogleGenAI({ apiKey });
+}
+
+function getTavilyClient() {
+    const apiKey = process.env.TAVILY_API_KEY?.trim();
+    if (!apiKey) {
+        throw new Error("Missing TAVILY_API_KEY. Add it to backend/.env");
+    }
+    return tavily({ apiKey });
+}
 
 const outputSchema = z.object({
     followup: z.array(z.string()),
@@ -80,7 +100,7 @@ export const deepResearchWorker = new Worker('DeepResearch', async (job: Job) =>
         console.log(`Starting deep research for job ${jobId}: "${query}"`);
         
         // 2. Heavy work (Simulate multiple searches or deep research)
-        const webResponse = await tavilyClient.search(query, { searchDepth: "advanced" });
+        const webResponse = await getTavilyClient().search(query, { searchDepth: "advanced" });
         const webResults = webResponse.results;
 
         // Fetch previous conversation if conversationId is provided
@@ -99,8 +119,8 @@ export const deepResearchWorker = new Worker('DeepResearch', async (job: Job) =>
             .replace("{{USER_QUERY}}", query);
         
         // 3. Query Gemini
-        const response = await ai.models.generateContentStream({
-            model: "gemini-3-flash-preview",
+        const response = await getGeminiClient().models.generateContentStream({
+            model: "gemini-2.5-flash",
             contents: prompt,
             config: {
                 systemInstruction: SYSTEM_PROMPT,

@@ -1,209 +1,202 @@
 # DeepQuery
 
+A full-stack AI research workspace. Ask a question, get a web-grounded answer streamed into chat, and keep the thread. For longer jobs, Deep Search queues work on Redis and a background worker so the UI stays responsive.
+
+The live demo is for chatting and auth. Deep Search needs Redis + a worker, so it runs in a local clone.
 
 https://github.com/user-attachments/assets/d91d3b52-4f66-4e76-aec0-c55860a35a30
 
-
-DeepQuery is a full-stack AI research chat app for turning web context into structured, conversational answers. It combines authenticated conversations, live web search, streamed AI responses, and asynchronous research jobs powered by a Redis-backed worker queue.
-
-I built it to make research feel like a focused workspace rather than a one-off chatbot: users can ask quick questions, continue earlier threads, and send longer research tasks into a background worker without leaving the chat.
+<img width="2166" height="1180" alt="DeepQuery screenshot" src="https://github.com/user-attachments/assets/85bdd0e8-0f82-4bad-85d8-f286c98378e9" />
 
 ## Features
 
-- AI chat with streamed responses
-- Web search context using Tavily
-- Conversation history saved in Postgres
-- Supabase authentication
-- Research Mode with Redis + BullMQ background jobs
-- Worker process for long-running research tasks
-- Research job status polling and persisted results
-- Optional webhook configuration for completed research jobs
-- React frontend with dark mode and markdown rendering
-- Prisma ORM with PostgreSQL
+- Streamed AI chat with Gemini
+- Live web context from Tavily
+- Google and GitHub sign-in via Supabase
+- Conversation history in Postgres
+- Deep Search: async research jobs on Redis + BullMQ
+- Worker that writes completed answers back into the thread
+- Dark mode, markdown answers, and source links
 
-## Tech Stack
+## Tech stack
 
-- Frontend: React, TypeScript, Tailwind CSS, Bun
-- Backend: Bun, Express, TypeScript
-- Database: PostgreSQL, Prisma
-- Auth: Supabase
-- AI: Google Gemini
-- Search: Tavily
-- Queue: Redis, BullMQ, ioredis
+| Layer | Tools |
+| --- | --- |
+| Frontend | React, TypeScript, Tailwind, Bun |
+| Backend | Bun, Express, TypeScript |
+| Database | PostgreSQL, Prisma |
+| Auth | Supabase (Google + GitHub) |
+| Models | Google Gemini |
+| Search | Tavily |
+| Queue | Redis, BullMQ |
 
 ## Architecture
 
 ```txt
-frontend/
-  React
-  Supabase login
-  Research Mode polling
+Browser
+  React UI
+  Supabase OAuth
+  Polls Deep Search status
 
-backend/
-  Express API
-  Prisma database access
-  Tavily search
-  Gemini response generation
-  BullMQ queue producer
+API  :3001
+  /ask        Tavily + Gemini stream
+  /research   Enqueue job (local only)
+  Prisma      Users, chats, jobs
 
-backend/worker.ts
-  BullMQ worker
-  Processes async research jobs
-  Saves completed results to chat history
+Worker
+  Pulls BullMQ jobs
+  Searches + generates
+  Saves the answer
 
-Redis
-  Queue backend for BullMQ
-
-Postgres
-  Users, conversations, messages, research jobs, webhook configs
+Redis     job queue
+Postgres  durable history
 ```
-
-<img width="2166" height="1180" alt="Screenshot from 2026-06-14 22-46-54" src="https://github.com/user-attachments/assets/85bdd0e8-0f82-4bad-85d8-f286c98378e9" />
-
-
-## Main API Flows
 
 Normal chat:
 
 ```txt
-User message -> /ask -> Tavily search -> Gemini stream -> save conversation
+message → /ask → Tavily → Gemini stream → save conversation
 ```
 
-Research Mode:
+Deep Search (local):
 
 ```txt
-User message -> /research -> create ResearchJob -> BullMQ queue
-Worker -> Tavily search -> Gemini answer -> save result -> frontend polls status
+message → /research → ResearchJob + BullMQ
+worker  → Tavily → Gemini → save result → UI polls status
 ```
 
-Research Mode is currently an async/background research workflow. It is not yet a full autonomous multi-step research agent.
+## Live demo vs local
 
-## Getting Started
+| | Live site | Local clone |
+| --- | --- | --- |
+| Google / GitHub login | Yes | Yes |
+| Skip-login test user | Hidden | http://localhost:3000/local |
+| Streamed chat | Yes | Yes |
+| Deep Search | Shows a “clone the repo” note | Full worker pipeline |
+
+The skip-login button and `/local` route only appear on `localhost`. Production visitors only see Google and GitHub.
+
+## Getting started
 
 ### Prerequisites
 
-- Bun
-- PostgreSQL database
-- Redis
-- Supabase project
-- Tavily API key
-- Google Gemini API key
+- [Bun](https://bun.sh)
+- Docker Desktop (Postgres + Redis)
+- A [Supabase](https://supabase.com) project
+- [Tavily](https://app.tavily.com/home) API key
+- [Gemini](https://aistudio.google.com/apikey) API key
 
 ### 1. Clone and install
 
 ```bash
-git clone <url>
+git clone https://github.com/Khizarshah01/deepquery.git
 cd deepquery
+
+cd backend && bun install
+cd ../frontend && bun install
 ```
 
-Install backend dependencies:
+### 2. Start Postgres and Redis
+
+From the repo root:
 
 ```bash
-cd backend
-bun install
+docker compose up -d
 ```
 
-Install frontend dependencies:
+This starts:
+
+- Postgres at `postgresql://deepquery:deepquery@127.0.0.1:5462/deepquery`
+- Redis at `redis://127.0.0.1:6382`
+
+Those ports avoid clashing with other local Docker apps.
+
+### 3. Environment
 
 ```bash
-cd ../frontend
-bun install
+cp backend/.env.example backend/.env
+cp frontend/.env.example frontend/.env
 ```
 
-### 2. Configure environment variables
-
-Create `backend/.env`:
+`backend/.env`:
 
 ```env
-DATABASE_URL="postgresql://USER:PASSWORD@HOST:PORT/DATABASE"
+DATABASE_URL="postgresql://deepquery:deepquery@127.0.0.1:5462/deepquery"
+REDIS_URL="redis://127.0.0.1:6382"
 PUBLIC_SUPABASE_URL="https://your-project.supabase.co"
-SECRET_KEY_BASE="your-supabase-service-role-or-secret-key"
+SECRET_KEY_BASE="your-supabase-service-role-key"
 GEMINI_API_KEY="your-gemini-api-key"
 TAVILY_API_KEY="your-tavily-api-key"
-REDIS_URL="redis://127.0.0.1:6379"
 ```
 
-Create `frontend/.env`:
+`frontend/.env`:
 
 ```env
 BUN_PUBLIC_SUPABASE_URL="https://your-project.supabase.co"
 BUN_PUBLIC_SUPABASE_PUBLISHABLE_KEY="your-supabase-anon-key"
+BUN_PUBLIC_BACKEND_URL="http://localhost:3001"
 ```
 
-The frontend backend URL is currently configured in:
+In Supabase → Authentication → URL Configuration, add:
 
 ```txt
-frontend/src/lib/config.ts
+http://localhost:3000
+http://localhost:3000/**
 ```
 
-Default:
+plus your live site URLs. Google’s callback stays:
 
-```ts
-export const BACKEND_URL = "http://localhost:3001";
+```txt
+https://YOUR-PROJECT.supabase.co/auth/v1/callback
 ```
 
-### 3. Setup the database
-
-From `backend/`:
+### 4. Database
 
 ```bash
+cd backend
 bunx prisma generate
 bunx prisma db push
 ```
 
-Use migrations instead of `db push` if you prefer a migration-based workflow.
-
-### 4. Start Redis
-
-Using Docker:
+### 5. Run the three processes
 
 ```bash
-docker run --name deepquery-redis -p 6379:6379 -d redis:7-alpine
+# terminal 1
+cd backend && bun run start
+
+# terminal 2
+cd backend && bun run worker
+
+# terminal 3
+cd frontend && bun run dev
 ```
 
-### 5. Run the backend API
+Then open [http://localhost:3000](http://localhost:3000).
 
-From `backend/`:
+- Sign in with Google/GitHub, or
+- Click **Skip login** / open [http://localhost:3000/local](http://localhost:3000/local) to test without OAuth
 
-```bash
-bun run start
-```
+## Keeping Supabase awake
 
-The API runs on:
+Free-tier Supabase pauses after about 7 days of inactivity. A cheap `SELECT 1` is not enough.
+
+DeepQuery follows [supabase-pause-prevention](https://github.com/travisvn/supabase-pause-prevention):
+
+- `/health` and `/keep-alive` insert or delete a row in a `keep_alive` table
+- They also ping the Supabase Auth API
+- `.github/workflows/keep-alive.yml` hits the live `/health` URL every 10 minutes
+
+After deploy, run `bunx prisma db push` on the hosted database so the `keep_alive` table exists.
+
+## Project layout
 
 ```txt
-http://localhost:3001
+frontend/     React app (Bun)
+backend/      Express API + BullMQ worker
+prisma/       schema + migrations (under backend/)
+docker-compose.yml
 ```
 
-### 6. Run the research worker
+## License
 
-Open a second terminal:
-
-```bash
-cd backend
-bun run worker
-```
-
-The worker must be running for Research Mode jobs to complete.
-
-### 7. Run the frontend
-
-Open a third terminal:
-
-```bash
-cd frontend
-bun run dev
-```
-
-## About DeepQuery
-
-DeepQuery is a production-minded research platform that delivers web-grounded answers, persistent conversation history, and scalable background research jobs, built for anyone who needs reliable, composable research workflows.
-
-## Current Limitations
-
-- Research Mode is async and queue-based, but not yet a true multi-step research agent.
-
-## Future Improvements
-
-- Multi-step research planning with generated subqueries
-- Multiple Tavily searches per research job
+MIT. See [LICENSE](LICENSE).

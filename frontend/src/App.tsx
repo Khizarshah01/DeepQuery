@@ -6,6 +6,7 @@ export function App() {
      <BrowserRouter>
      <Routes>
         <Route path="/auth" element={<Auth />} />
+        <Route path="/local" element={<Conversation />} />
         <Route path="/" element={<Conversation />} />
      </Routes>
      </BrowserRouter>

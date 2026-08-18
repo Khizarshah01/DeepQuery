@@ -1,0 +1,31 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: deepquery-postgres
+    environment:
+      POSTGRES_USER: deepquery
+      POSTGRES_PASSWORD: deepquery
+      POSTGRES_DB: deepquery
+    ports:
+      - "5462:5432"
+    volumes:
+      - deepquery_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U deepquery -d deepquery"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    container_name: deepquery-redis
+    ports:
+      - "6382:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  deepquery_postgres:

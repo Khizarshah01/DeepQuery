@@ -1,15 +1,26 @@
-import { createClient } from "@/lib/supabase/client";
+import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Github } from "lucide-react";
 import { GoogleIcon } from "@/components/icons/flat-color-icons-google";
+import { useNavigate } from "react-router";
+import { isLocalHost } from "../lib/localSession";
 
-const supabase = createClient();
+const supabase = hasSupabaseConfig() ? createClient() : null;
 
 export default function Auth() {
+    const navigate = useNavigate();
     async function login(provider: "github" | "google") {
+        if (!supabase) {
+            console.error("Supabase is not configured. Add keys to frontend/.env");
+            return;
+        }
+
         const { data, error } = await supabase.auth.signInWithOAuth({
             provider: provider,
+            options: {
+                redirectTo: `${window.location.origin}/`,
+            },
         });
         if (error) {
             console.error("Error during login:", error);
@@ -36,7 +47,7 @@ export default function Auth() {
                 <CardHeader className="space-y-1 text-center">
                     <CardTitle className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Welcome back</CardTitle>
                     <CardDescription className="text-slate-500 dark:text-gray-400">
-                        Sign in to your DeepQuery account to continue
+                        Continue with Google or GitHub
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="grid gap-4">
@@ -56,6 +67,27 @@ export default function Auth() {
                         <Github className="mr-2 h-5 w-5" />
                         Continue with GitHub
                     </Button>
+                    {isLocalHost() && (
+                        <>
+                            <div className="relative py-1">
+                                <div className="absolute inset-0 flex items-center">
+                                    <span className="w-full border-t border-slate-200 dark:border-white/10" />
+                                </div>
+                                <div className="relative flex justify-center text-xs uppercase">
+                                    <span className="bg-transparent px-2 text-slate-400 dark:text-white/40">or test locally</span>
+                                </div>
+                            </div>
+                            <Button
+                                onClick={() => navigate("/local")}
+                                className="relative h-12 w-full justify-center text-base font-semibold bg-emerald-600 text-white hover:bg-emerald-500"
+                            >
+                                Skip login — continue locally
+                            </Button>
+                            <p className="text-center text-xs text-slate-500 dark:text-white/40">
+                                No Google or GitHub. Opens the local test workspace.
+                            </p>
+                        </>
+                    )}
                 </CardContent>
             </Card>
         </div>
