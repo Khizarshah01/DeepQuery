@@ -1,5 +1,9 @@
 # DeepQuery
 
+
+https://github.com/user-attachments/assets/d91d3b52-4f66-4e76-aec0-c55860a35a30
+
+
 DeepQuery is a full-stack AI research chat app for turning web context into structured, conversational answers. It combines authenticated conversations, live web search, streamed AI responses, and asynchronous research jobs powered by a Redis-backed worker queue.
 
 I built it to make research feel like a focused workspace rather than a one-off chatbot: users can ask quick questions, continue earlier threads, and send longer research tasks into a background worker without leaving the chat.
