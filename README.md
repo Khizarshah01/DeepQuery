@@ -6,8 +6,6 @@ The live demo is for chatting and auth. Deep Search needs Redis + a worker, so i
 
 https://github.com/user-attachments/assets/d91d3b52-4f66-4e76-aec0-c55860a35a30
 
-<img width="2166" height="1180" alt="DeepQuery screenshot" src="https://github.com/user-attachments/assets/85bdd0e8-0f82-4bad-85d8-f286c98378e9" />
-
 ## Features
 
 - Streamed AI chat with Gemini
@@ -32,43 +30,9 @@ https://github.com/user-attachments/assets/d91d3b52-4f66-4e76-aec0-c55860a35a30
 
 ## Architecture
 
-GitHub draws this automatically. You do not need extra software — open the README on GitHub after you push.
+This is the uploaded diagram. GitHub shows it as an image — you do not need extra software.
 
-```mermaid
-flowchart TB
-  user[User in the browser]
-
-  subgraph live [Live site]
-    fe[React frontend]
-    api[Express API]
-    auth[Supabase Auth]
-    pg[(Postgres via Supabase)]
-    tavily[Tavily search]
-    gemini[Gemini]
-    gha[GitHub Action every 10 min]
-  end
-
-  subgraph localOnly [Local clone only]
-    redis[(Redis + BullMQ)]
-    worker[Research worker]
-  end
-
-  user --> fe
-  fe -->|Google / GitHub login| auth
-  fe -->|JWT: /ask, /conversation| api
-  api --> auth
-  api --> pg
-  api --> tavily
-  api --> gemini
-  gha -->|GET /health keep_alive write| api
-
-  fe -.->|Deep Search only on localhost| api
-  api -.->|enqueue job| redis
-  redis -.-> worker
-  worker -.-> tavily
-  worker -.-> gemini
-  worker -.-> pg
-```
+<img width="2166" height="1180" alt="DeepQuery architecture" src="https://github.com/user-attachments/assets/85bdd0e8-0f82-4bad-85d8-f286c98378e9" />
 
 Normal chat:
 
