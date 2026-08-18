@@ -32,24 +32,42 @@ https://github.com/user-attachments/assets/d91d3b52-4f66-4e76-aec0-c55860a35a30
 
 ## Architecture
 
-```txt
-Browser
-  React UI
-  Supabase OAuth
-  Polls Deep Search status
+GitHub draws this automatically. You do not need extra software — open the README on GitHub after you push.
 
-API  :3001
-  /ask        Tavily + Gemini stream
-  /research   Enqueue job (local only)
-  Prisma      Users, chats, jobs
+```mermaid
+flowchart TB
+  user[User in the browser]
 
-Worker
-  Pulls BullMQ jobs
-  Searches + generates
-  Saves the answer
+  subgraph live [Live site]
+    fe[React frontend]
+    api[Express API]
+    auth[Supabase Auth]
+    pg[(Postgres via Supabase)]
+    tavily[Tavily search]
+    gemini[Gemini]
+    gha[GitHub Action every 10 min]
+  end
 
-Redis     job queue
-Postgres  durable history
+  subgraph localOnly [Local clone only]
+    redis[(Redis + BullMQ)]
+    worker[Research worker]
+  end
+
+  user --> fe
+  fe -->|Google / GitHub login| auth
+  fe -->|JWT: /ask, /conversation| api
+  api --> auth
+  api --> pg
+  api --> tavily
+  api --> gemini
+  gha -->|GET /health keep_alive write| api
+
+  fe -.->|Deep Search only on localhost| api
+  api -.->|enqueue job| redis
+  redis -.-> worker
+  worker -.-> tavily
+  worker -.-> gemini
+  worker -.-> pg
 ```
 
 Normal chat:
