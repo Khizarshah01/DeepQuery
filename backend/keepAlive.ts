@@ -11,7 +11,19 @@ function randomName(length = 12) {
     return value;
 }
 
+async function ensureTable() {
+    await prisma.$executeRawUnsafe(`
+        CREATE TABLE IF NOT EXISTS keep_alive (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+    `);
+}
+
 export async function touchKeepAlive() {
+    await ensureTable();
+
     const existing = await prisma.keepAlive.findMany({
         orderBy: { createdAt: "asc" },
         select: { id: true, name: true },

@@ -3,7 +3,7 @@ const { tavily } = require('@tavily/core');
 import { z } from "zod";
 const { zodToJsonSchema } = require("zod-to-json-schema");
 const app = express();
-const port = 3001;
+const port = Number(process.env.PORT) || 3001;
 import { GoogleGenAI } from "@google/genai";
 import { PROMPT_TEMPLATE, SYSTEM_PROMPT } from './prompt';
 import { prisma } from './db';
@@ -106,7 +106,7 @@ app.get('/health', async (req, res) => {
         console.error('Health check Supabase ping error:', e);
     }
 
-    const healthy = database === 'connected' && keepAlive.ok;
+    const healthy = database === 'connected';
     res.status(healthy ? 200 : 500).json({
         status: healthy ? 'ok' : 'error',
         database,
@@ -570,5 +570,5 @@ app.get('/research/status/:jobId', authMiddleware, async(req:AuthedRequest,res:R
     res.json({status: job.status, result: job.result, query: job.query})
 })
 app.listen(port, () => {
-    console.log(`DeepQuery API listening on http://localhost:${port}`);
+    console.log(`DeepQuery API listening on port ${port}`);
 });

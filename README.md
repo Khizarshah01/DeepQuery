@@ -168,7 +168,7 @@ DeepQuery follows [supabase-pause-prevention](https://github.com/travisvn/supaba
 - They also ping the Supabase Auth API
 - `.github/workflows/keep-alive.yml` hits the live `/health` URL every 10 minutes
 
-After deploy, run `bunx prisma db push` on the hosted database so the `keep_alive` table exists.
+The first `/health` ping creates the `keep_alive` table if it is missing. You do not need a hosted shell for that.
 
 ## Project layout
 
